@@ -1,0 +1,6 @@
+framework module Pods_Rio_Tests {
+  umbrella header "Pods-Rio_Tests-umbrella.h"
+
+  export *
+  module * { export * }
+}

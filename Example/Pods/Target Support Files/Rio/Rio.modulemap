@@ -1,0 +1,6 @@
+framework module Rio {
+  umbrella header "Rio-umbrella.h"
+
+  export *
+  module * { export * }
+}

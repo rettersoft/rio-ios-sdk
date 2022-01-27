@@ -1,0 +1,6 @@
+framework module Pods_Rio_Example {
+  umbrella header "Pods-Rio_Example-umbrella.h"
+
+  export *
+  module * { export * }
+}
