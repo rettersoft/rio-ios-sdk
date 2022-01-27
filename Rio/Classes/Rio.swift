@@ -94,6 +94,7 @@ struct RioTokenData: Mappable, Decodable {
     var refreshToken: String?
     var firebaseToken: String?
     var firebase: CloudOption?
+    var deltaTime: Double?
     
     var accessTokenExpiresAt: Date? {
         get {
@@ -137,6 +138,7 @@ struct RioTokenData: Mappable, Decodable {
         accessToken <- map["accessToken"]
         refreshToken <- map["refreshToken"]
         firebaseToken <- map["firebaseToken"]
+        deltaTime <- map["deltaTime"]
     }
 }
 
@@ -272,6 +274,8 @@ public class Rio {
     
     private let logger: RioLogger
     
+    private var deltaTime: TimeInterval = 0
+    
     public init(config: RioConfig) {
         self.logger = RioLogger(isLoggingEnabled: config.isLoggingEnabled ?? false)
         if let sslPinningEnabled = config.sslPinningEnabled, sslPinningEnabled == false {
@@ -303,7 +307,7 @@ public class Rio {
     
     private var safeNow: Date {
         get {
-            return Date(timeIntervalSinceNow: 30)
+            return Date(timeIntervalSinceNow: 30 + deltaTime)
         }
     }
     
@@ -354,6 +358,8 @@ public class Rio {
                let accessTokenExpiresAt = tokenData.accessTokenExpiresAt,
                let projectId = tokenData.projectId {
                 
+                deltaTime = tokenData.deltaTime ?? 0
+                
                 if(projectId == self.projectId) {
                     logger.log("refreshTokenExpiresAt \(refreshTokenExpiresAt)")
                     logger.log("accessTokenExpiresAt \(accessTokenExpiresAt)")
@@ -393,7 +399,10 @@ public class Rio {
             }
         }
         
-        guard let tokenData = tokenData else {
+        var tokenDataWithDeltaTime = tokenData
+        tokenDataWithDeltaTime?.deltaTime = deltaTime
+        
+        guard let tokenData = tokenDataWithDeltaTime else {
             
             if storedUserId != nil {
                 DispatchQueue.main.async {
@@ -465,8 +474,9 @@ public class Rio {
         self.service.request(.getAnonymToken(request: getAnonymTokenRequest)) { [weak self] result in
             switch result {
             case .success(let response):
-                let resp = try! response.map(RioTokenResponse.self)
-                retVal = resp.response
+                let resp = try? response.map(RioTokenResponse.self)
+                self?.checkForDeltaTime(for: resp?.response.accessToken)
+                retVal = resp?.response
             default:
                 break
             }
@@ -491,13 +501,14 @@ public class Rio {
         refreshTokenRequest.projectId = projectId
         refreshTokenRequest.userId = tokenData.userId
         
-        var retVal:RioTokenData? = nil
+        var retVal: RioTokenData? = nil
         
         self.service.request(.refreshToken(request: refreshTokenRequest)) {
             [weak self] result in
             switch result {
             case .success(let response):
-                retVal = try! response.map(RioTokenData.self)
+                retVal = try? response.map(RioTokenData.self)
+                self?.checkForDeltaTime(for: retVal?.accessToken)
                 break
             default:
                 break
@@ -513,6 +524,16 @@ public class Rio {
             return r
         }
         throw "Can't refresh token"
+    }
+    
+    private func checkForDeltaTime(for token: String?) {
+        guard let accessToken = token,
+              let jwt = try? decode(jwt: accessToken),
+              let serverTime = jwt.claim(name: "iat").integer else {
+                return
+        }
+        
+        deltaTime =  TimeInterval(serverTime) - Date().timeIntervalSince1970
     }
     
     private func executeAction(
