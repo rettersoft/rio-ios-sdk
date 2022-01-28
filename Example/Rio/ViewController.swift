@@ -70,7 +70,7 @@ class ViewController: UIViewController {
 }
 
 extension ViewController : RioClientDelegate {
-    func rbsClient(client: Rio, authStatusChanged toStatus: RioClientAuthStatus) {
+    func rioClient(client: Rio, authStatusChanged toStatus: RioClientAuthStatus) {
         print("-- RioDebug in VC Auth status \(toStatus)")
     }
 }

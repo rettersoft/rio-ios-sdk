@@ -155,7 +155,7 @@ public enum RioCulture: String {
 }
 
 public protocol RioClientDelegate {
-    func rbsClient(client: Rio, authStatusChanged toStatus: RioClientAuthStatus)
+    func rioClient(client: Rio, authStatusChanged toStatus: RioClientAuthStatus)
 }
 
 enum RioKeychainKey {
@@ -222,18 +222,18 @@ public class Rio {
                         let user = RioUser(uid: userId, isAnonymous: anonymous)
                         
                         if anonymous {
-                            self.delegate?.rbsClient(client: self, authStatusChanged: .signedInAnonymously(user: user))
+                            self.delegate?.rioClient(client: self, authStatusChanged: .signedInAnonymously(user: user))
                         } else {
-                            self.delegate?.rbsClient(client: self, authStatusChanged: .signedIn(user: user))
+                            self.delegate?.rioClient(client: self, authStatusChanged: .signedIn(user: user))
                         }
                     } else {
-                        self.delegate?.rbsClient(client: self, authStatusChanged: .signedOut)
+                        self.delegate?.rioClient(client: self, authStatusChanged: .signedOut)
                     }
                 } else {
-                    self.delegate?.rbsClient(client: self, authStatusChanged: .signedOut)
+                    self.delegate?.rioClient(client: self, authStatusChanged: .signedOut)
                 }
             } else {
-                self.delegate?.rbsClient(client: self, authStatusChanged: .signedOut)
+                self.delegate?.rioClient(client: self, authStatusChanged: .signedOut)
             }
             
         }
@@ -408,7 +408,7 @@ public class Rio {
             
             if storedUserId != nil {
                 DispatchQueue.main.async {
-                    self.delegate?.rbsClient(client: self, authStatusChanged: .signedOut)
+                    self.delegate?.rioClient(client: self, authStatusChanged: .signedOut)
                 }
             }
             
@@ -452,9 +452,9 @@ public class Rio {
                     
                     DispatchQueue.main.async {
                         if anonymous {
-                            self.delegate?.rbsClient(client: self, authStatusChanged: .signedInAnonymously(user: user))
+                            self.delegate?.rioClient(client: self, authStatusChanged: .signedInAnonymously(user: user))
                         } else {
-                            self.delegate?.rbsClient(client: self, authStatusChanged: .signedIn(user: user))
+                            self.delegate?.rioClient(client: self, authStatusChanged: .signedIn(user: user))
                         }
                     }
                     
