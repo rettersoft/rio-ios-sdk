@@ -10,47 +10,50 @@ import UIKit
 import Rio
 
 class ViewController: UIViewController {
-
-    var rioObj:RioCloudObject?
-    @IBOutlet weak var lblValue: UILabel!
     
-    let rio = Rio.init(config: RioConfig(projectId: "15gs19h2ek"))
+    
+    
+    let rio = Rio.init(config: RioConfig(projectId: "15gs19h2ek", isLoggingEnabled: true))
+    
+    var rioObj:RioCloudObject?
+    
+    @IBOutlet weak var lblValue: UILabel!
     
     override func viewDidLoad() {
         super.viewDidLoad()
-    
+        
         rio.delegate = self
-        
-//        rio.signInAnonymously()
-        
-        
-//        rio.getCloudObject(with: RioCloudObjectOptions(classID: "Test")) { object in
-//
-//            print("InstanceId is \(object.instanceId)")
-//
-//            self.rioObj = object
-//
-//            self.rioObj?.state?.public.subscribe(onSuccess: { data in
-//                if let data = data, let r = data["r"] {
-//                    print("\(r)")
-//                    self.lblValue.text = "\(r)"
-//                }
-//
-//            }, onError: { err in
-//
-//            })
-//
-//        } onError: { error in
-//
-//        }
-        
-        
-        
 
     }
-
-    @IBAction func btnTapped(_ sender: Any) {
+    
+    @IBAction func btnGetObjectTapped(_ sender: Any) {
         
+        if rioObj != nil { return }
+        
+        rio.getCloudObject(with: RioCloudObjectOptions(classID: "Test")) { object in
+            
+            print("InstanceId is \(object.instanceId)")
+            
+            self.rioObj = object
+            
+            self.rioObj?.state?.public.subscribe(onSuccess: { data in
+                if let data = data, let r = data["r"] {
+                    print("\(r)")
+                    self.lblValue.text = "\(r)"
+                }
+                
+            }, onError: { err in
+                
+            })
+            
+        } onError: { error in
+            
+        }
+        
+        
+    }
+    
+    @IBAction func btnSayHelloTapped(_ sender: Any) {
         self.rioObj?.call(with: RioCloudObjectOptions(method: "sayHello")) { resp in
             
             print("resp \(resp.body)")
@@ -58,12 +61,16 @@ class ViewController: UIViewController {
         } onError: { error in
             
         }
-        
+    }
+    
+    @IBAction func signOutTapped(_ sender: Any) {
+        rio.signOut()
+        rioObj = nil
     }
 }
 
 extension ViewController : RioClientDelegate {
     func rbsClient(client: Rio, authStatusChanged toStatus: RioClientAuthStatus) {
-        print("Auth status \(toStatus)")
+        print("-- RioDebug in VC Auth status \(toStatus)")
     }
 }

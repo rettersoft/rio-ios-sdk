@@ -23,6 +23,9 @@
                                 <rect key="frame" x="140.5" y="318" width="94" height="31"/>
                                 <state key="normal" title="Button"/>
                                 <buttonConfiguration key="configuration" style="plain" title="Get Object"/>
+                                <connections>
+                                    <action selector="btnGetObjectTapped:" destination="vXZ-lx-hvc" eventType="touchUpInside" id="eZA-7k-nlK"/>
+                                </connections>
                             </button>
                             <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Label" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="7T0-Ja-IcS">
                                 <rect key="frame" x="166.5" y="289" width="42" height="21"/>
@@ -34,14 +37,27 @@
                                 <rect key="frame" x="145" y="347" width="85" height="31"/>
                                 <state key="normal" title="Button"/>
                                 <buttonConfiguration key="configuration" style="plain" title="Say Hello"/>
+                                <connections>
+                                    <action selector="btnSayHelloTapped:" destination="vXZ-lx-hvc" eventType="touchUpInside" id="lJZ-tt-6BM"/>
+                                </connections>
+                            </button>
+                            <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="pKG-yk-1gg">
+                                <rect key="frame" x="148.5" y="383" width="78" height="31"/>
+                                <state key="normal" title="Button"/>
+                                <buttonConfiguration key="configuration" style="plain" title="Sign out"/>
+                                <connections>
+                                    <action selector="signOutTapped:" destination="vXZ-lx-hvc" eventType="touchUpInside" id="EHY-xd-vWa"/>
+                                </connections>
                             </button>
                         </subviews>
                         <color key="backgroundColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         <constraints>
+                            <constraint firstItem="pKG-yk-1gg" firstAttribute="top" secondItem="ILO-hQ-SWa" secondAttribute="bottom" constant="8" symbolic="YES" id="3LU-Wi-GkL"/>
                             <constraint firstItem="7T0-Ja-IcS" firstAttribute="centerX" secondItem="OKW-TF-EVn" secondAttribute="centerX" id="4vI-jM-5nz"/>
                             <constraint firstItem="ILO-hQ-SWa" firstAttribute="top" secondItem="OKW-TF-EVn" secondAttribute="bottom" constant="-5" id="7iX-7e-7Y6"/>
                             <constraint firstItem="OKW-TF-EVn" firstAttribute="centerY" secondItem="kh9-bI-dsS" secondAttribute="centerY" id="9QZ-Pt-5cG"/>
                             <constraint firstItem="OKW-TF-EVn" firstAttribute="top" secondItem="7T0-Ja-IcS" secondAttribute="bottom" constant="8" symbolic="YES" id="Osk-cO-Isd"/>
+                            <constraint firstItem="pKG-yk-1gg" firstAttribute="centerX" secondItem="ILO-hQ-SWa" secondAttribute="centerX" id="UmE-ha-rvr"/>
                             <constraint firstItem="OKW-TF-EVn" firstAttribute="centerX" secondItem="kh9-bI-dsS" secondAttribute="centerX" id="XV0-T3-ap4"/>
                             <constraint firstItem="ILO-hQ-SWa" firstAttribute="centerX" secondItem="OKW-TF-EVn" secondAttribute="centerX" id="ugL-Aj-bYw"/>
                         </constraints>

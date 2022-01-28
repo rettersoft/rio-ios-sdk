@@ -72,7 +72,7 @@ struct RioLogger {
     
     func log(_ text: Any) {
         if isLoggingEnabled {
-            print(text)
+            print("RioDebug: \(text)")
         }
     }
 }
@@ -307,7 +307,9 @@ public class Rio {
     
     private var safeNow: Date {
         get {
-            return Date(timeIntervalSinceNow: 30 + deltaTime)
+            let r = Date(timeIntervalSinceNow: 30 + deltaTime)
+            logger.log("Safenow is \(r) with delta \(deltaTime)")
+            return r
         }
     }
     
@@ -365,12 +367,12 @@ public class Rio {
                     logger.log("accessTokenExpiresAt \(accessTokenExpiresAt)")
                     if refreshTokenExpiresAt > now && accessTokenExpiresAt > now {
                         // Token can be used
-                        logger.log("DEBUG111 returning tokenData")
+                        logger.log("returning tokenData")
                         return tokenData
                     }
                     
                     if refreshTokenExpiresAt > now && accessTokenExpiresAt < now {
-                        logger.log("DEBUG111 refreshing token")
+                        logger.log("refreshing token")
                         // DO REFRESH
                         let refreshTokenRequest = RefreshTokenRequest()
                         refreshTokenRequest.refreshToken = refreshToken
@@ -386,7 +388,7 @@ public class Rio {
     }
     
     private func saveTokenData(tokenData: RioTokenData?) {
-        logger.log("DEBUG111 saveTokenData called with tokenData")
+        logger.log("saveTokenData called with tokenData")
         var storedUserId: String? = nil
         // First get last stored token data from keychain.
         if let data = self.keychain.getData(RioKeychainKey.token.keyName) {
@@ -419,14 +421,14 @@ public class Rio {
         let data = try! JSONSerialization.data(withJSONObject: obj, options: .prettyPrinted)
         self.keychain.set(data, forKey: RioKeychainKey.token.keyName)
         
-        logger.log("DEBUG111 saveTokenData 2")
+        logger.log("saveTokenData 2")
         
         if let accessToken = tokenData.accessToken {
             let jwt = try! decode(jwt: accessToken)
             if let userId = jwt.claim(name: "userId").string, let anonymous = jwt.claim(name: "anonymous").rawValue as? Bool {
                 
                 if userId != storedUserId {
-                    logger.log("DEBUG111 userId \(userId) - stored: \(storedUserId)")
+                    logger.log("userId \(userId) - stored: \(storedUserId)")
                     // User has changed.
                     let user = RioUser(uid: userId, isAnonymous: anonymous)
                     
@@ -436,12 +438,12 @@ public class Rio {
                     
                     cloudObjects.removeAll()
                     
-                    logger.log("DEBUG111 initFirebaseApp 1")
+                    logger.log("initFirebaseApp 1")
                     if let app = self.firebaseApp, let customToken = tokenData.firebase?.customToken {
-                        self.logger.log("DEBUG111 FIREBASE custom auth \(userId)")
+                        self.logger.log("FIREBASE custom auth \(userId)")
                        
                         Auth.auth(app: app).signIn(withCustomToken: customToken) { [weak self] (resp, error)  in
-                            self?.logger.log("DEBUG111 FIREBASE custom auth COMPLETE user: \(resp?.user)")
+                            self?.logger.log("FIREBASE custom auth COMPLETE user: \(resp?.user)")
                             self?.firebaseAuthSemaphore.signal()
                         }
                         
@@ -777,13 +779,13 @@ public class Rio {
         logger.log("send called")
         
         serialQueue.async {
-            self.logger.log("DEBUG111 send called in async block")
+            self.logger.log("send called in async block")
             do {
                 
-                self.logger.log("DEBUG111 getTokenData called in send")
+                self.logger.log("getTokenData called in send")
                 let tokenData = try self.getTokenData()
                 
-                self.logger.log("DEBUG111 saveTokenData called in send")
+                self.logger.log("saveTokenData called in send")
                 self.saveTokenData(tokenData: tokenData)
                 
                 if actionName == "signInAnonym" {
@@ -803,7 +805,7 @@ public class Rio {
                         )
                         
                         DispatchQueue.main.async {
-                            self.logger.log("DEBUG111 send onSuccess")
+                            self.logger.log("send onSuccess")
                             onSuccess(actionResult)
                         }
                     } catch {
