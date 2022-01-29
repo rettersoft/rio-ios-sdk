@@ -170,12 +170,29 @@ enum RioKeychainKey {
     }
 }
 
+struct ValidationError: Decodable {
+    let issues: [ValidationIssue]?
+}
+
+public struct ValidationIssue: Decodable {
+    let message: String?
+    let params: Params?
+    
+    public struct Params: Decodable {
+        let missingProperty: String? // required missing dependency - only the first one is reported
+        let property: String? // dependent property,
+        let deps: String? // required dependencies, comma separated list as a string (TODO change to string[])
+        let depsCount: Int? // the number of required dependencies
+    }
+}
+
 public enum RioError: Error {
     case TokenError,
          cloudNotConfigured,
          classIdRequired,
          cloudObjectNotFound,
          methodReturnedError,
+         validationError(validationIssues: [ValidationIssue]),
          parsingError,
          firebaseInitError
 }
@@ -459,8 +476,6 @@ public class Rio {
                     }
                     
                 }
-                
-                
             }
         }
     }
@@ -906,7 +921,14 @@ public class Rio {
             }
         } onError: { (error) in
             if let error = error as? BaseErrorResponse, let cloudObjectResponse = error.cloudObjectResponse {
-                onError(RioCloudObjectError(error: .cloudObjectNotFound, response: cloudObjectResponse))
+
+                if let errorData = cloudObjectResponse.body,
+                   let validatationError = try? JSONDecoder().decode(ValidationError.self, from: errorData),
+                   let issues = validatationError.issues {
+                    onError(RioCloudObjectError(error: .validationError(validationIssues: issues), response: cloudObjectResponse))
+                } else {
+                    onError(RioCloudObjectError(error: .cloudObjectNotFound, response: cloudObjectResponse))
+                }
             }
         }
     }
@@ -995,7 +1017,13 @@ public class RioCloudObject {
             }
         } onError: { (error) in
             if let error = error as? BaseErrorResponse, let cloudObjectResponse = error.cloudObjectResponse {
-                onError(RioCloudObjectError(error: .methodReturnedError, response: cloudObjectResponse))
+                if let errorData = cloudObjectResponse.body,
+                   let validatationError = try? JSONDecoder().decode(ValidationError.self, from: errorData),
+                   let issues = validatationError.issues {
+                    onError(RioCloudObjectError(error: .validationError(validationIssues: issues), response: cloudObjectResponse))
+                } else {
+                    onError(RioCloudObjectError(error: .methodReturnedError, response: cloudObjectResponse))
+                }
             }
         }
     }
