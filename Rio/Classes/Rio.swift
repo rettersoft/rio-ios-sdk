@@ -303,10 +303,11 @@ public class Rio {
         }
         
         
-        let firebaseOptions = FirebaseOptions(googleAppID: "1:814752823492:ios:6429462157e997a146f191",
-                                              gcmSenderID: "814752823492")
-        firebaseOptions.projectID = "rtbs-c82e1"
-        firebaseOptions.apiKey = "AIzaSyCYKQHVjql92jRX350a7dEaxQUhgkSxiUE"
+        let firebaseOptions = FirebaseOptions(googleAppID: "1:1060598260564:ios:e2e8d6ad8c297c1319dec1",
+                                              gcmSenderID: "1060598260564")
+        firebaseOptions.projectID = "retterio"
+        firebaseOptions.apiKey = "AIzaSyAnUv1-qAZYj-MqT0qg-_ErsxJmu1gAOtg"
+        
         
         FirebaseApp.configure(name: "rbs", options: firebaseOptions)
         
