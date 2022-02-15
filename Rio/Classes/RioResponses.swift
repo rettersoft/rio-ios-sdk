@@ -69,8 +69,9 @@ class BaseErrorResponse: Decodable, Error {
     var code: Int? // unknown
     var httpStatusCode: Int? // unknown
     var cloudObjectResponse: RioCloudObjectResponse?
+    var moyaError: MoyaError?
     
-    private enum CodingKeys: String, CodingKey { case code, message, httpStatusCode }
+    private enum CodingKeys: String, CodingKey { case code, message, httpStatusCode, moyaError }
     
     required init(from decoder: Decoder) throws {
         do {

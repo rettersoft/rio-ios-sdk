@@ -220,7 +220,8 @@ public enum RioError: Error {
          validationError(validationIssues: [ValidationIssue]),
          parsingError,
          firebaseInitError,
-         networkError(statusCode: Int)
+         networkError(statusCode: Int),
+         moyaError(MoyaError)
 }
 
 extension String: LocalizedError {
@@ -524,8 +525,8 @@ public class Rio {
                 } else {
                     authSuccess?(false, .networkError(statusCode: response.statusCode))
                 }
-            case .failure:
-                authSuccess?(false, .networkError(statusCode: -1))
+            case .failure(let f):
+                authSuccess?(false, .moyaError(f))
             }
             self?.semaphore.signal()
         }
@@ -564,8 +565,8 @@ public class Rio {
                 } else {
                     authSuccess?(false, .networkError(statusCode: response.statusCode))
                 }
-            case .failure:
-                authSuccess?(false, .networkError(statusCode: -1))
+            case .failure(let f):
+                authSuccess?(false, .moyaError(f))
             }
             self?.semaphore.signal()
         }
@@ -656,6 +657,7 @@ public class Rio {
                 errorResponse = BaseErrorResponse()
                 errorResponse?.cloudObjectResponse = RioCloudObjectResponse(statusCode: -1, headers: nil, body: nil)
                 errorResponse?.httpStatusCode = -1
+                errorResponse?.moyaError = f
             }
             semaphoreLocal.signal()
         }
@@ -708,9 +710,8 @@ public class Rio {
                     } else {
                         authSuccess?(false, .networkError(statusCode: response.statusCode))
                     }
-                case .failure:
-                    authSuccess?(false, .networkError(statusCode: -1))
-                    break
+                case .failure(let f):
+                    authSuccess?(false, .moyaError(f))
                 }
                 self?.semaphore.signal()
             }
@@ -719,15 +720,19 @@ public class Rio {
         }
     }
     
-    public func signInAnonymously() {
+    public func signInAnonymously(completion: (() -> Void)? = nil) {
         send(
             action: "signInAnonym",
             data: [:],
-            headers: nil) { _ in }
-            onError: { _ in }
+            headers: nil) { _ in
+                completion?()
+            }
+            onError: { _ in
+                completion?()
+            }
     }
     
-    public func signOut() {
+    public func signOut(authSuccess: ((Bool, RioError?) -> Void)? = nil) {
         
         if let data = self.keychain.getData(RioKeychainKey.token.keyName),
            let json = try? JSONSerialization.jsonObject(with: data, options: []) {
@@ -743,10 +748,14 @@ public class Rio {
                 
                 self.service.request(.signout(request: req)) { result in
                     switch result {
-                    case .success(_):
-                        break
-                    default:
-                        break
+                    case .success(let response):
+                        if (200...299).contains(response.statusCode) {
+                            authSuccess?(true, nil)
+                        } else {
+                            authSuccess?(false, .networkError(statusCode: response.statusCode))
+                        }
+                    case .failure(let f):
+                        authSuccess?(false, .moyaError(f))
                     }
                 }
             }
@@ -972,6 +981,8 @@ public class Rio {
                    let validatationError = try? JSONDecoder().decode(ValidationError.self, from: errorData),
                    let issues = validatationError.issues {
                     onError(RioCloudObjectError(error: .validationError(validationIssues: issues), response: cloudObjectResponse))
+                } else if let moyaError = error.moyaError {
+                    onError(RioCloudObjectError(error: .moyaError(moyaError), response: cloudObjectResponse))
                 } else {
                     onError(RioCloudObjectError(error: .cloudObjectNotFound, response: cloudObjectResponse))
                 }
@@ -1067,6 +1078,8 @@ public class RioCloudObject {
                    let validatationError = try? JSONDecoder().decode(ValidationError.self, from: errorData),
                    let issues = validatationError.issues {
                     onError(RioCloudObjectError(error: .validationError(validationIssues: issues), response: cloudObjectResponse))
+                } else if let moyaError = error.moyaError {
+                    onError(RioCloudObjectError(error: .moyaError(moyaError), response: cloudObjectResponse))
                 } else {
                     onError(RioCloudObjectError(error: .methodReturnedError, response: cloudObjectResponse))
                 }
