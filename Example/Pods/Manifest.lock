@@ -490,7 +490,7 @@ PODS:
   - nanopb/encode (2.30908.0)
   - ObjectMapper (3.5.3)
   - PromisesObjC (2.0.0)
-  - Rio (0.0.1):
+  - Rio (0.0.6):
     - Alamofire (~> 5.2)
     - Firebase (~> 8.11.0)
     - Firebase/Auth (~> 8.11.0)
@@ -560,7 +560,7 @@ SPEC CHECKSUMS:
   nanopb: a0ba3315591a9ae0a16a309ee504766e90db0c96
   ObjectMapper: 97111c97e054a6ee25917662106689f0b4127b37
   PromisesObjC: 68159ce6952d93e17b2dfe273b8c40907db5ba58
-  Rio: 44c2405156d6c58a2a0587303963d134374b23d6
+  Rio: e78f38f91a0630ede8e97dbef35fb50a44a1958b
   TrustKit: dac38bb37e49bdfeca41b1a19d020da38017b51c
 
 PODFILE CHECKSUM: 0d3c3ae55b5678f76f7787bb9708aef8eabc31f4
