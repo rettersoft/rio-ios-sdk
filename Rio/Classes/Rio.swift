@@ -219,7 +219,8 @@ public enum RioError: Error {
          methodReturnedError,
          validationError(validationIssues: [ValidationIssue]),
          parsingError,
-         firebaseInitError
+         firebaseInitError,
+         networkError(statusCode: Int)
 }
 
 extension String: LocalizedError {
@@ -501,7 +502,7 @@ public class Rio {
         }
     }
     
-    private func getAnonymToken() throws -> RioTokenData {
+    private func getAnonymToken(authSuccess: ((Bool, RioError?) -> Void)? = nil) throws -> RioTokenData {
         logger.log("getAnonymToken called")
         
         let getAnonymTokenRequest = GetAnonymTokenRequest()
@@ -512,11 +513,19 @@ public class Rio {
         self.service.request(.getAnonymToken(request: getAnonymTokenRequest)) { [weak self] result in
             switch result {
             case .success(let response):
-                let resp = try? response.map(RioTokenResponse.self)
-                self?.checkForDeltaTime(for: resp?.response.accessToken)
-                retVal = resp?.response
-            default:
-                break
+                if (200...299).contains(response.statusCode) {
+                    if let resp = try? response.map(RioTokenResponse.self) {
+                        self?.checkForDeltaTime(for: resp.response.accessToken)
+                        retVal = resp.response
+                        authSuccess?(true, nil)
+                    } else {
+                        authSuccess?(false, .parsingError)
+                    }
+                } else {
+                    authSuccess?(false, .networkError(statusCode: response.statusCode))
+                }
+            case .failure:
+                authSuccess?(false, .networkError(statusCode: -1))
             }
             self?.semaphore.signal()
         }
@@ -531,7 +540,7 @@ public class Rio {
         throw "Can't get anonym token"
     }
     
-    private func refreshToken(tokenData: RioTokenData) throws -> RioTokenData {
+    private func refreshToken(tokenData: RioTokenData, authSuccess: ((Bool, RioError?) -> Void)? = nil) throws -> RioTokenData {
         logger.log("refreshToken called")
         
         let refreshTokenRequest = RefreshTokenRequest()
@@ -541,15 +550,22 @@ public class Rio {
         
         var retVal: RioTokenData? = nil
         
-        self.service.request(.refreshToken(request: refreshTokenRequest)) {
-            [weak self] result in
+        self.service.request(.refreshToken(request: refreshTokenRequest)) { [weak self] result in
             switch result {
             case .success(let response):
-                retVal = try? response.map(RioTokenData.self)
-                self?.checkForDeltaTime(for: retVal?.accessToken)
-                break
-            default:
-                break
+                if (200...299).contains(response.statusCode) {
+                    if let val = try? response.map(RioTokenData.self) {
+                        self?.checkForDeltaTime(for: val.accessToken)
+                        retVal = val
+                        authSuccess?(true, nil)
+                    } else {
+                        authSuccess?(false, .parsingError)
+                    }
+                } else {
+                    authSuccess?(false, .networkError(statusCode: response.statusCode))
+                }
+            case .failure:
+                authSuccess?(false, .networkError(statusCode: -1))
             }
             self?.semaphore.signal()
         }
@@ -635,10 +651,11 @@ public class Rio {
                                                                                                                 body: response.data) : nil
                     }
                 }
-                break
             case .failure(let f):
                 self.logger.log(f)
-                break
+                errorResponse = BaseErrorResponse()
+                errorResponse?.cloudObjectResponse = RioCloudObjectResponse(statusCode: -1, headers: nil, body: nil)
+                errorResponse?.httpStatusCode = -1
             }
             semaphoreLocal.signal()
         }
@@ -658,7 +675,7 @@ public class Rio {
     
     // MARK: - Public methods
     
-    public func authenticateWithCustomToken(_ customToken: String) {
+    public func authenticateWithCustomToken(_ customToken: String, authSuccess: ((Bool, RioError?) -> Void)? = nil) {
         logger.log("authenticateWithCustomToken called")
         serialQueue.async {
             
@@ -677,14 +694,22 @@ public class Rio {
             self.service.request(.authWithCustomToken(request: req)) { [weak self] result in
                 switch result {
                 case .success(let response):
-                    var tokenData = try! response.map(RioTokenData.self)
-                    tokenData.projectId = self?.config.projectId
-                    tokenData.isAnonym = false
-                    self?.serialQueue.async {
-                        self?.saveTokenData(tokenData: tokenData)
+                    if (200...299).contains(response.statusCode) {
+                        if var tokenData = try? response.map(RioTokenData.self) {
+                            tokenData.projectId = self?.config.projectId
+                            tokenData.isAnonym = false
+                            self?.serialQueue.async {
+                                self?.saveTokenData(tokenData: tokenData)
+                                authSuccess?(true, nil)
+                            }
+                        } else {
+                            authSuccess?(false, .parsingError)
+                        }
+                    } else {
+                        authSuccess?(false, .networkError(statusCode: response.statusCode))
                     }
-                    break
-                default:
+                case .failure:
+                    authSuccess?(false, .networkError(statusCode: -1))
                     break
                 }
                 self?.semaphore.signal()
