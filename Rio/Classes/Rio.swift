@@ -11,11 +11,6 @@ import FirebaseFirestore
 import FirebaseAuth
 
 
-struct FirebaseConfig {
-    
-    
-}
-
 public enum RioRegion {
     case euWest1, euWest1Beta
     
@@ -25,7 +20,6 @@ public enum RioRegion {
         case .euWest1Beta: return "https://root.test-api.rtbs.io"
         }
     }
-    
     
     var postUrl:String {
         switch self {
@@ -251,7 +245,6 @@ public class Rio {
     
     public var delegate: RioClientDelegate? {
         didSet {
-            
             // Check token data and raise status update
             if let data = self.keychain.getData(RioKeychainKey.token.keyName) {
                 let json = try! JSONSerialization.jsonObject(with: data, options: [])
@@ -283,8 +276,8 @@ public class Rio {
         }
     }
     
-    var _service: MoyaProvider<RioService>?
-    var service : MoyaProvider<RioService> {
+    private var _service: MoyaProvider<RioService>?
+    private var service : MoyaProvider<RioService> {
         get {
             if self._service != nil {
                 return self._service!
@@ -309,9 +302,9 @@ public class Rio {
         }
     }
     
-    let keychain = KeychainSwift()
+    private let keychain = KeychainSwift()
     
-    var config: RioConfig!
+    private var config: RioConfig!
     
     private var firebaseApp: FirebaseApp?
     fileprivate var db: Firestore?
@@ -503,30 +496,32 @@ public class Rio {
         }
     }
     
-    private func getAnonymToken(authSuccess: ((Bool, RioError?) -> Void)? = nil) throws -> RioTokenData {
+    private func getAnonymToken() throws -> RioTokenData {
         logger.log("getAnonymToken called")
         
         let getAnonymTokenRequest = GetAnonymTokenRequest()
         getAnonymTokenRequest.projectId = self.config.projectId
         
         var retVal: RioTokenData? = nil
+        var errorResponse: BaseErrorResponse?
         
         self.service.request(.getAnonymToken(request: getAnonymTokenRequest)) { [weak self] result in
             switch result {
             case .success(let response):
-                if (200...299).contains(response.statusCode) {
-                    if let resp = try? response.map(RioTokenResponse.self) {
-                        self?.checkForDeltaTime(for: resp.response.accessToken)
-                        retVal = resp.response
-                        authSuccess?(true, nil)
-                    } else {
-                        authSuccess?(false, .parsingError)
-                    }
+                if (200...299).contains(response.statusCode),
+                   let resp = try? response.map(RioTokenResponse.self) {
+                    self?.checkForDeltaTime(for: resp.response.accessToken)
+                    retVal = resp.response
                 } else {
-                    authSuccess?(false, .networkError(statusCode: response.statusCode))
+                    errorResponse = BaseErrorResponse()
+                    errorResponse?.cloudObjectResponse = RioCloudObjectResponse(statusCode: response.statusCode, headers: nil, body: nil)
+                    errorResponse?.httpStatusCode = response.statusCode
                 }
             case .failure(let f):
-                authSuccess?(false, .moyaError(f))
+                errorResponse = BaseErrorResponse()
+                errorResponse?.cloudObjectResponse = RioCloudObjectResponse(statusCode: -1, headers: nil, body: nil)
+                errorResponse?.httpStatusCode = -1
+                errorResponse?.moyaError = f
             }
             self?.semaphore.signal()
         }
@@ -534,14 +529,17 @@ public class Rio {
         
         retVal?.projectId = self.config.projectId
         retVal?.isAnonym = true
-        
+
+        if let e = errorResponse {
+            throw e
+        }
         if let r = retVal {
             return r
         }
         throw "Can't get anonym token"
     }
     
-    private func refreshToken(tokenData: RioTokenData, authSuccess: ((Bool, RioError?) -> Void)? = nil) throws -> RioTokenData {
+    private func refreshToken(tokenData: RioTokenData) throws -> RioTokenData {
         logger.log("refreshToken called")
         
         let refreshTokenRequest = RefreshTokenRequest()
@@ -550,23 +548,25 @@ public class Rio {
         refreshTokenRequest.userId = tokenData.userId
         
         var retVal: RioTokenData? = nil
+        var errorResponse: BaseErrorResponse?
         
         self.service.request(.refreshToken(request: refreshTokenRequest)) { [weak self] result in
             switch result {
             case .success(let response):
-                if (200...299).contains(response.statusCode) {
-                    if let val = try? response.map(RioTokenData.self) {
-                        self?.checkForDeltaTime(for: val.accessToken)
-                        retVal = val
-                        authSuccess?(true, nil)
-                    } else {
-                        authSuccess?(false, .parsingError)
-                    }
+                if (200...299).contains(response.statusCode),
+                   let val = try? response.map(RioTokenData.self) {
+                    self?.checkForDeltaTime(for: val.accessToken)
+                    retVal = val
                 } else {
-                    authSuccess?(false, .networkError(statusCode: response.statusCode))
+                    errorResponse = BaseErrorResponse()
+                    errorResponse?.cloudObjectResponse = RioCloudObjectResponse(statusCode: response.statusCode, headers: nil, body: nil)
+                    errorResponse?.httpStatusCode = response.statusCode
                 }
             case .failure(let f):
-                authSuccess?(false, .moyaError(f))
+                errorResponse = BaseErrorResponse()
+                errorResponse?.cloudObjectResponse = RioCloudObjectResponse(statusCode: -1, headers: nil, body: nil)
+                errorResponse?.httpStatusCode = -1
+                errorResponse?.moyaError = f
             }
             self?.semaphore.signal()
         }
@@ -574,7 +574,10 @@ public class Rio {
         
         retVal?.projectId = tokenData.projectId
         retVal?.isAnonym = tokenData.isAnonym
-        
+
+        if let e = errorResponse {
+            throw e
+        }
         if let r = retVal {
             return r
         }
@@ -724,12 +727,12 @@ public class Rio {
         send(
             action: "signInAnonym",
             data: [:],
-            headers: nil) { _ in
-                completion?()
-            }
-            onError: { _ in
-                completion?()
-            }
+            headers: nil
+        ) { _ in
+            completion?()
+        } onError: { _ in
+            completion?()
+        }
     }
     
     public func signOut(authSuccess: ((Bool, RioError?) -> Void)? = nil) {
@@ -832,7 +835,7 @@ public class Rio {
                 }
                 
             } catch {
-                
+                onError(error)
             }
         }
     }
@@ -886,7 +889,9 @@ public class Rio {
                 }
                 
             } catch {
-                
+                DispatchQueue.main.async {
+                    onError(error)
+                }
             }
         }
     }
