@@ -30,11 +30,16 @@ class ViewController: UIViewController {
         
         if rioObj != nil { return }
         
+        
+        
+        
         rio.getCloudObject(with: RioCloudObjectOptions(classID: "Test")) { object in
             
             print("InstanceId is \(object.instanceId)")
             
             self.rioObj = object
+            
+//            self.rioObj?.call(with: RioCloudObjectOptions(, onSuccess: <#T##(RioCloudObjectResponse) -> Void#>, onError: <#T##(RioCloudObjectError) -> Void#>)
             
             self.rioObj?.state?.public.subscribe(onSuccess: { data in
                 if let data = data, let r = data["r"] {
@@ -54,7 +59,7 @@ class ViewController: UIViewController {
     }
     
     @IBAction func btnSayHelloTapped(_ sender: Any) {
-        self.rioObj?.call(with: RioCloudObjectOptions(method: "sayHello")) { resp in
+        self.rioObj?.call(with: RioCloudObjectOptions(method: "sayHello", culture: "tr-TR")) { resp in
             
             print("resp \(resp.body)")
             

@@ -10,6 +10,7 @@ import FirebaseCore
 import FirebaseFirestore
 import FirebaseAuth
 
+let defaultCulture = "en-us"
 
 public enum RioRegion {
     case euWest1, euWest1Beta
@@ -65,6 +66,7 @@ public struct RioConfig {
     var region: RioRegion?
     var sslPinningEnabled: Bool?
     var isLoggingEnabled: Bool?
+    var culture: String? = defaultCulture
     
     public init(
         projectId: String,
@@ -333,9 +335,16 @@ public class Rio {
         self.firebaseApp = app
         self.db = Firestore.firestore(app: app)
         
+        
         self.config = config
         self.projectId = config.projectId
         globalRioRegion = config.region!
+    }
+    
+    private var culture : String {
+        get {
+            return self.config.culture == nil ? defaultCulture : self.config.culture!
+        }
     }
     
     private var safeNow: Date {
@@ -786,7 +795,7 @@ public class Rio {
         cloudObjects.removeAll()
     }
     
-    public func generatePublicGetActionUrl(
+    private func generatePublicGetActionUrl(
         action actionName: String,
         data: [String: Any]
     ) -> String {
@@ -806,7 +815,7 @@ public class Rio {
         return url
     }
     
-    public func generateGetActionUrl(
+    private func generateGetActionUrl(
         action actionName: String,
         data: [String: Any],
         onSuccess: @escaping (_ result: String) -> Void,
@@ -844,7 +853,6 @@ public class Rio {
         action actionName: String,
         data: [String: Any],
         headers: [String: String]?,
-        culture: RioCulture? = nil,
         cloudObjectOptions: RioCloudObjectOptions? = nil,
         onSuccess: @escaping (_ result: [Any]) -> Void,
         onError: @escaping (_ error: Error) -> Void
@@ -872,7 +880,7 @@ public class Rio {
                             tokenData: tokenData,
                             action: actionName,
                             data: data,
-                            culture: culture?.rawValue,
+                            culture: cloudObjectOptions?.culture,
                             headers: headers,
                             cloudObjectOptions: cloudObjectOptions
                         )
@@ -925,7 +933,7 @@ public class Rio {
                 instanceID: options.instanceID!,
                 userID: "",
                 userIdentity: "",
-                rbs: self,
+                rio: self,
                 isLocal: true
             ))
             return
@@ -973,7 +981,7 @@ public class Rio {
                         instanceID: respInstanceId,
                         userID: userId ?? "",
                         userIdentity: userIdentity ?? "",
-                        rbs: self
+                        rio: self
                     )
                     self.cloudObjects.append(object)
                     onSuccess(object)
@@ -1017,7 +1025,7 @@ public class RioCloudObject {
     private let userID: String
     private let userIdentity: String
     private weak var db: Firestore?
-    private weak var rbs: Rio?
+    private weak var rio: Rio?
     public let state: State?
     private let isLocal: Bool
     
@@ -1027,14 +1035,14 @@ public class RioCloudObject {
         }
     }
     
-    init(projectID: String, classID: String, instanceID: String, userID: String, userIdentity: String, rbs: Rio?, isLocal: Bool = false) {
+    init(projectID: String, classID: String, instanceID: String, userID: String, userIdentity: String, rio: Rio?, isLocal: Bool = false) {
         self.projectID = projectID
         self.classID = classID
         self.instanceID = instanceID
         self.userID = userID
         self.userIdentity = userIdentity
-        self.rbs = rbs
-        self.db = rbs?.db
+        self.rio = rio
+        self.db = rio?.db
         self.isLocal = isLocal
         
         if !isLocal {
@@ -1061,11 +1069,11 @@ public class RioCloudObject {
         let parameters: [String: Any] = options.body?.compactMapValues( { $0 }) ?? [:]
         let headers = options.headers?.compactMapValues( { $0 } ) ?? [:]
         
-        guard let rbs = rbs else {
+        guard let rio = rio else {
             return
         }
         
-        rbs.send(
+        rio.send(
             action: "rbs.core.request.CALL",
             data: parameters,
             headers: headers,
@@ -1189,6 +1197,7 @@ public struct RioCloudObjectOptions {
     public var httpMethod: Moya.Method?
     public var body: [String: Any]?
     public var useLocal: Bool?
+    public var culture: String? = defaultCulture
     
     public init(
         classID: String? = nil,
@@ -1199,7 +1208,8 @@ public struct RioCloudObjectOptions {
         queryString: [String: String]? = nil,
         httpMethod: Moya.Method? = nil,
         body: [String: Any]? = nil,
-        useLocal: Bool? = nil
+        useLocal: Bool? = nil,
+        culture: String? = nil
     ) {
         self.classID = classID
         self.instanceID = instanceID
@@ -1210,6 +1220,7 @@ public struct RioCloudObjectOptions {
         self.httpMethod = httpMethod
         self.body = body
         self.useLocal = useLocal
+        self.culture = culture == nil ? defaultCulture : culture
     }
 }
 

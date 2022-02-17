@@ -97,6 +97,13 @@ enum RioService {
                         parameters[key] = value
                     }
                 }
+                
+                if let culture = request.culture {
+                    parameters["__culture"] = culture
+                }
+                
+                parameters["__platform"] = "IOS"
+                
                 return parameters
             }
             
