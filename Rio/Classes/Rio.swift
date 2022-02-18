@@ -429,7 +429,7 @@ public class Rio {
         return try self.getAnonymToken()
     }
     
-    private func saveTokenData(tokenData: RioTokenData?) {
+    private func saveTokenData(tokenData: RioTokenData?, isForCustomTokenFlow: Bool = false) {
         logger.log("saveTokenData called with tokenData")
         var storedUserId: String? = nil
         // First get last stored token data from keychain.
@@ -450,7 +450,9 @@ public class Rio {
             
             if storedUserId != nil {
                 DispatchQueue.main.async {
-                    self.delegate?.rioClient(client: self, authStatusChanged: .signedOut)
+                    if !isForCustomTokenFlow {
+                        self.delegate?.rioClient(client: self, authStatusChanged: .signedOut)
+                    }
                 }
             }
             
@@ -693,7 +695,7 @@ public class Rio {
         logger.log("authenticateWithCustomToken called")
         serialQueue.async {
             
-            self.saveTokenData(tokenData: nil)
+            self.saveTokenData(tokenData: nil, isForCustomTokenFlow: true)
             let req = AuthWithCustomTokenRequest()
             req.customToken = customToken
             
