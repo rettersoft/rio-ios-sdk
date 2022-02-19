@@ -75,9 +75,9 @@ public struct RioConfig {
         serviceId: String? = nil,
         region: RioRegion? = nil,
         sslPinningEnabled: Bool? = nil,
-        isLoggingEnabled: Bool = false
+        isLoggingEnabled: Bool = false,
+        culture: String? = nil
     ) {
-        
         self.projectId = projectId
         self.secretKey = secretKey
         self.developerId = developerId
@@ -85,6 +85,7 @@ public struct RioConfig {
         self.region = region == nil ? .euWest1 : region
         self.sslPinningEnabled = sslPinningEnabled
         self.isLoggingEnabled = isLoggingEnabled
+        self.culture = culture == nil ? defaultCulture : culture
     }
 }
 
@@ -341,7 +342,7 @@ public class Rio {
         globalRioRegion = config.region!
     }
     
-    private var culture : String {
+    public var culture : String {
         get {
             return self.config.culture == nil ? defaultCulture : self.config.culture!
         }
@@ -912,25 +913,28 @@ public class Rio {
         onError: @escaping (RioCloudObjectError) -> Void
     ) {
         
-        guard let classId = options.classID else {
+        var options2 = options
+        if options2.culture == nil { options2.culture = self.culture }
+        
+        guard let classId = options2.classID else {
             onError(RioCloudObjectError(error: RioError.classIdRequired, response: nil))
             return
         }
         
-        if let instance = options.instanceID,
+        if let instance = options2.instanceID,
            let object = cloudObjects.filter({ $0.classID == classId && $0.instanceID == instance }).first {
             onSuccess(object)
             return
         }
         
-        let parameters: [String: Any] = options.body?.compactMapValues( { $0 }) ?? [:]
-        let headers = options.headers?.compactMapValues( { $0 } ) ?? [:]
+        let parameters: [String: Any] = options2.body?.compactMapValues( { $0 }) ?? [:]
+        let headers = options2.headers?.compactMapValues( { $0 } ) ?? [:]
         
-        if (options.useLocal ?? false) && options.instanceID != nil {
+        if (options2.useLocal ?? false) && options2.instanceID != nil {
             onSuccess(RioCloudObject(
                 projectID: self.projectId,
                 classID: classId,
-                instanceID: options.instanceID!,
+                instanceID: options2.instanceID!,
                 userID: "",
                 userIdentity: "",
                 rio: self,
@@ -943,7 +947,7 @@ public class Rio {
             action: "rbs.core.request.INSTANCE",
             data: parameters,
             headers: headers,
-            cloudObjectOptions: options
+            cloudObjectOptions: options2
         ) { [weak self] (response) in
             guard let self = self else {
                 return
@@ -1065,6 +1069,7 @@ public class RioCloudObject {
         var options2 = options
         options2.classID = self.classID
         options2.instanceID = self.instanceID
+        options2.culture = options.culture == nil ? self.rio?.culture : options.culture
         
         let parameters: [String: Any] = options.body?.compactMapValues( { $0 }) ?? [:]
         let headers = options.headers?.compactMapValues( { $0 } ) ?? [:]
@@ -1197,7 +1202,7 @@ public struct RioCloudObjectOptions {
     public var httpMethod: Moya.Method?
     public var body: [String: Any]?
     public var useLocal: Bool?
-    public var culture: String? = defaultCulture
+    public var culture: String?
     
     public init(
         classID: String? = nil,

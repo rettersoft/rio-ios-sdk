@@ -13,7 +13,7 @@ class ViewController: UIViewController {
     
     
     
-    let rio = Rio.init(config: RioConfig(projectId: "15gs19h2ek", isLoggingEnabled: true))
+    let rio = Rio.init(config: RioConfig(projectId: "15gs19h2ek", isLoggingEnabled: true, culture: "sl-TR"))
     
     var rioObj:RioCloudObject?
     
