@@ -27,7 +27,7 @@ enum RioService {
     var endPoint: String {
         switch self {
         case .getAnonymToken(let request):
-            return "/INSTANCE/ProjectUser"
+            return "/root/INSTANCE/ProjectUser"
         case .executeAction(let request):
             let isExcludedAction = cloudObjectActions.contains(request.actionName ?? "")
             
@@ -35,24 +35,24 @@ enum RioService {
                 return "/user/action/\(request.projectId!)/\(request.actionName!)"
             } else {
                 if request.actionName == "rbs.core.request.CALL" {
-                    return "CALL/\(request.classID ?? "")/\(request.method ?? "")/\(request.instanceID ?? "")"
+                    return "/\(request.projectId!)/CALL/\(request.classID ?? "")/\(request.method ?? "")/\(request.instanceID ?? "")"
                 }
                 
                 if let instanceID = request.instanceID {
-                    return "/INSTANCE/\(request.classID ?? "")/\(instanceID)"
+                    return "/\(request.projectId!)/INSTANCE/\(request.classID ?? "")/\(instanceID)"
                 } else if let keyValue = request.keyValue {
-                    return "/INSTANCE/\(request.classID ?? "")/\(keyValue.key)!\(keyValue.value)"
+                    return "/\(request.projectId!)/INSTANCE/\(request.classID ?? "")/\(keyValue.key)!\(keyValue.value)"
                 } else {
-                    return "/INSTANCE/\(request.classID ?? "")"
+                    return "/\(request.projectId!)/INSTANCE/\(request.classID ?? "")"
                 }
                 
             }
         case .refreshToken(let request):
-            return "/CALL/ProjectUser/refreshToken/\(request.projectId ?? "")_\(request.userId ?? "")"
+            return "/root/CALL/ProjectUser/refreshToken/\(request.projectId ?? "")_\(request.userId ?? "")"
         case .authWithCustomToken(let request):
-            return "/CALL/ProjectUser/authWithCustomToken/\(request.projectId ?? "")_\(request.userId ?? "")"
+            return "/root/CALL/ProjectUser/authWithCustomToken/\(request.projectId ?? "")_\(request.userId ?? "")"
         case .signout(let request):
-            return "/CALL/ProjectUser/signOut/\(request.projectId ?? "")_\(request.userId ?? "")"
+            return "/root/CALL/ProjectUser/signOut/\(request.projectId ?? "")_\(request.userId ?? "")"
         }
     }
     
@@ -187,7 +187,7 @@ extension RioService: TargetType, AccessTokenAuthorizable {
                 return URL(string: "https://\(request.projectId!).\(globalRioRegion.apiURL)")!
             }
         default:
-            return URL(string: globalRioRegion.postUrl)!
+            return URL(string: "https://root.\(globalRioRegion.apiURL)")!
         }
     }
     var path: String { return self.endPoint }

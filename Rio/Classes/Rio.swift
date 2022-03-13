@@ -17,24 +17,24 @@ public enum RioRegion {
     
     var getUrl:String {
         switch self {
-        case .euWest1: return "https://root.api.rtbs.io"
-        case .euWest1Beta: return "https://root.test-api.rtbs.io"
+        case .euWest1: return "https://root.api.retter.io"
+        case .euWest1Beta: return "https://root.test-api.retter.io"
         }
     }
     
     var postUrl:String {
         switch self {
-        case .euWest1: return "https://root.api.rtbs.io"
-        case .euWest1Beta: return "https://root.test-api.rtbs.io"
+        case .euWest1: return "https://root.api.retter.io"
+        case .euWest1Beta: return "https://root.test-api.retter.io"
         }
     }
     
     var apiURL: String {
         switch self {
         case .euWest1:
-            return "api.rtbs.io"
+            return "api.retter.io"
         case .euWest1Beta:
-            return "test-api.rtbs.io"
+            return "test-api.retter.io"
         }
     }
     
