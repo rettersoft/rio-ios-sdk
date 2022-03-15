@@ -208,6 +208,10 @@ public struct ValidationIssue: Decodable {
     }
 }
 
+public struct RioCloudListResponse: Decodable {
+    public let instanceIds: [String]?
+}
+
 public enum RioError: Error {
     case TokenError,
          cloudNotConfigured,
@@ -1088,6 +1092,57 @@ public class RioCloudObject {
         ) { (response) in
             if let objectResponse = response.first as? RioCloudObjectResponse {
                 onSuccess(objectResponse)
+            } else {
+                let errorResponse = RioCloudObjectResponse(statusCode: -1, headers: nil, body: response.first as? Data)
+                onError(RioCloudObjectError(error: .parsingError, response: errorResponse))
+            }
+        } onError: { (error) in
+            if let error = error as? BaseErrorResponse, let cloudObjectResponse = error.cloudObjectResponse {
+                if let errorData = cloudObjectResponse.body,
+                   let validatationError = try? JSONDecoder().decode(ValidationError.self, from: errorData),
+                   let issues = validatationError.issues {
+                    onError(RioCloudObjectError(error: .validationError(validationIssues: issues), response: cloudObjectResponse))
+                } else if let moyaError = error.moyaError {
+                    onError(RioCloudObjectError(error: .moyaError(moyaError), response: cloudObjectResponse))
+                } else {
+                    onError(RioCloudObjectError(error: .methodReturnedError, response: cloudObjectResponse))
+                }
+            }
+        }
+    }
+    
+    public func listInstances(
+        with options: RioCloudObjectOptions,
+        onSuccess: @escaping (RioCloudListResponse) -> Void,
+        onError: @escaping (RioCloudObjectError) -> Void
+    ) {
+        
+        var options2 = options
+        options2.classID = self.classID
+        options2.instanceID = self.instanceID
+        options2.culture = options.culture == nil ? self.rio?.culture : options.culture
+        
+        let parameters: [String: Any] = options.body?.compactMapValues( { $0 }) ?? [:]
+        let headers = options.headers?.compactMapValues( { $0 } ) ?? [:]
+        
+        guard let rio = rio else {
+            return
+        }
+        
+        rio.send(
+            action: "rio.core.request.LIST",
+            data: parameters,
+            headers: headers,
+            cloudObjectOptions: options2
+        ) { (response) in
+            if let objectResponse = response.first as? RioCloudObjectResponse {
+                if let data = objectResponse.body,
+                   let list = try? JSONDecoder().decode(RioCloudListResponse.self, from: data) {
+                    onSuccess(list)
+                } else {
+                    let errorResponse = RioCloudObjectResponse(statusCode: -1, headers: nil, body: response.first as? Data)
+                    onError(RioCloudObjectError(error: .parsingError, response: errorResponse))
+                }
             } else {
                 let errorResponse = RioCloudObjectResponse(statusCode: -1, headers: nil, body: response.first as? Data)
                 onError(RioCloudObjectError(error: .parsingError, response: errorResponse))

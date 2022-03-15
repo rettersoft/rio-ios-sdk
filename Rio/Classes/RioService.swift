@@ -13,7 +13,7 @@ import ObjectMapper
 
 var globalRioRegion:RioRegion = .euWest1
 
-let cloudObjectActions = ["rbs.core.request.INSTANCE", "rbs.core.request.CALL"]
+let cloudObjectActions = ["rbs.core.request.INSTANCE", "rbs.core.request.CALL", "rio.core.request.LIST"]
 
 enum RioService {
     
@@ -26,7 +26,7 @@ enum RioService {
     
     var endPoint: String {
         switch self {
-        case .getAnonymToken(let request):
+        case .getAnonymToken:
             return "/root/INSTANCE/ProjectUser"
         case .executeAction(let request):
             let isExcludedAction = cloudObjectActions.contains(request.actionName ?? "")
@@ -34,6 +34,10 @@ enum RioService {
             if !isExcludedAction {
                 return "/user/action/\(request.projectId!)/\(request.actionName!)"
             } else {
+                if request.actionName == "rio.core.request.LIST" {
+                    return "/\(request.projectId!)/LIST/\(request.classID ?? "")"
+                }
+
                 if request.actionName == "rbs.core.request.CALL" {
                     return "/\(request.projectId!)/CALL/\(request.classID ?? "")/\(request.method ?? "")/\(request.instanceID ?? "")"
                 }
