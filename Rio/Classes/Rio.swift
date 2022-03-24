@@ -964,6 +964,13 @@ public class Rio {
                   let cloudResponse = try? JSONDecoder().decode(RioCloudObjectInstanceResponse.self, from: data) else {
                       return
                   }
+
+            var objectData: Data?
+            if let insDict = try? JSONSerialization.jsonObject(with: data, options: .mutableContainers) as? [String: Any],
+               let insRespDict = insDict?["response"],
+               let insRespData = try? JSONSerialization.data(withJSONObject: insRespDict, options: JSONSerialization.WritingOptions.prettyPrinted) {
+                objectData = insRespData
+            }
             
             if let respInstanceId = cloudResponse.instanceId {
                 
@@ -991,7 +998,10 @@ public class Rio {
                         instanceID: respInstanceId,
                         userID: userId ?? "",
                         userIdentity: userIdentity ?? "",
-                        rio: self
+                        rio: self,
+                        response: objectData,
+                        methods: cloudResponse.methods,
+                        isNewInstance: cloudResponse.isNewInstance ?? false
                     )
                     self.cloudObjects.append(object)
                     onSuccess(object)
@@ -1038,6 +1048,9 @@ public class RioCloudObject {
     private weak var rio: Rio?
     public let state: State?
     private let isLocal: Bool
+    public let response: Data?
+    public let methods: [RioCloudObjectMethod]?
+    public let isNewInstance: Bool
     
     public var instanceId: String {
         get {
@@ -1045,7 +1058,7 @@ public class RioCloudObject {
         }
     }
     
-    init(projectID: String, classID: String, instanceID: String, userID: String, userIdentity: String, rio: Rio?, isLocal: Bool = false) {
+    init(projectID: String, classID: String, instanceID: String, userID: String, userIdentity: String, rio: Rio?, isLocal: Bool = false, response: Data? = nil, methods: [RioCloudObjectMethod]? = nil, isNewInstance: Bool = false) {
         self.projectID = projectID
         self.classID = classID
         self.instanceID = instanceID
@@ -1054,6 +1067,9 @@ public class RioCloudObject {
         self.rio = rio
         self.db = rio?.db
         self.isLocal = isLocal
+        self.response = response
+        self.methods = methods
+        self.isNewInstance = isNewInstance
         
         if !isLocal {
             state = State(
@@ -1292,8 +1308,8 @@ struct RioCloudObjectInstanceResponse: Decodable {
     let instanceId: String?
 }
 
-struct RioCloudObjectMethod: Decodable {
-    let name: String?
+public struct RioCloudObjectMethod: Decodable {
+    public let name: String?
     let readOnly: Bool?
     let sync: Bool?
     let tag: String?
