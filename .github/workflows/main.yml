@@ -9,8 +9,7 @@ on:
 jobs:
   build:
   runs-on: macOS-latest
-    
-    steps:
+  steps:
     - uses: actions/checkout@v1
     - name: Publish to CocoaPod register
       env:
