@@ -15,4 +15,4 @@ jobs:
         env:
           COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
         run: |
-          pod trunk push Rio.podspec
+          pod trunk push --allow-warnings Rio.podspec
