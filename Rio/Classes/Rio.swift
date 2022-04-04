@@ -966,9 +966,8 @@ public class Rio {
                   }
 
             var objectData: Data?
-            if let insDict = try? JSONSerialization.jsonObject(with: data, options: .mutableContainers) as? [String: Any],
-               let insRespDict = insDict?["response"],
-               let insRespData = try? JSONSerialization.data(withJSONObject: insRespDict, options: JSONSerialization.WritingOptions.prettyPrinted) {
+            if let insDict = (try? JSONSerialization.jsonObject(with: data, options: .mutableContainers)) as? [String: Any],
+               let insRespData = try? JSONSerialization.data(withJSONObject: insDict["response"] as Any, options: JSONSerialization.WritingOptions.prettyPrinted) {
                 objectData = insRespData
             }
             
