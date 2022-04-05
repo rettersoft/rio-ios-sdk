@@ -206,7 +206,7 @@ extension RioService: TargetType, AccessTokenAuthorizable {
         switch self {
         case .executeAction(let request):
             
-            if(self.isGetAction(request.actionName)) {
+            if isGetAction(request.actionName) || httpMethod == .get {
                 return .requestParameters(parameters: self.urlParameters, encoding: URLEncoding.default)
             }
             
