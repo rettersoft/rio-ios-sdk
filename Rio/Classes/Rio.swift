@@ -67,6 +67,7 @@ public struct RioConfig {
     var sslPinningEnabled: Bool?
     var isLoggingEnabled: Bool?
     var culture: String? = defaultCulture
+    var retryConfig: RetryConfig?
     
     public init(
         projectId: String,
@@ -76,7 +77,8 @@ public struct RioConfig {
         region: RioRegion? = nil,
         sslPinningEnabled: Bool? = nil,
         isLoggingEnabled: Bool = false,
-        culture: String? = nil
+        culture: String? = nil,
+        retryConfig: RetryConfig? = nil
     ) {
         self.projectId = projectId
         self.secretKey = secretKey
@@ -86,6 +88,19 @@ public struct RioConfig {
         self.sslPinningEnabled = sslPinningEnabled
         self.isLoggingEnabled = isLoggingEnabled
         self.culture = culture == nil ? defaultCulture : culture
+        self.retryConfig = retryConfig == nil ? RetryConfig() : retryConfig
+    }
+}
+
+public struct RetryConfig {
+    let delay: Double // in milliseconds
+    let rate: Double
+    let count: Int
+    
+    public init(delay: Double = 50, rate: Double = 1.5, count: Int = 3) {
+        self.delay = delay
+        self.rate = rate
+        self.count = count
     }
 }
 
@@ -311,12 +326,12 @@ public class Rio {
     
     private let keychain = KeychainSwift()
     
-    private var config: RioConfig!
+    fileprivate var config: RioConfig!
     
     private var firebaseApp: FirebaseApp?
     fileprivate var db: Firestore?
     
-    private let logger: RioLogger
+    fileprivate let logger: RioLogger
     
     private var deltaTime: TimeInterval = 0
     
@@ -1114,6 +1129,23 @@ open class RioCloudObject {
             }
         } onError: { (error) in
             if let error = error as? BaseErrorResponse, let cloudObjectResponse = error.cloudObjectResponse {
+                if let statusCode = error.cloudObjectResponse?.statusCode, statusCode == 570 {
+                    let config = options2.retryConfig ?? RetryConfig()
+                    let remaining = config.count - 1
+                    rio.logger.log("Remaining count for retry -> \(remaining)")
+                    if remaining < 1 {
+                        let specialResponse = RioCloudObjectResponse(statusCode: 570, headers: nil, body: nil)
+                        onError(RioCloudObjectError(error: .methodReturnedError, response: specialResponse))
+                        return
+                    } else {
+                        let delay = config.delay * config.rate
+                        let newRetryConfig = RetryConfig(delay: delay, rate: config.rate, count: remaining)
+                        var newOptions = options2
+                        newOptions.retryConfig = newRetryConfig
+                        self.handleSpecialCase(with: newOptions, onSuccess: onSuccess, onError: onError)
+                        return
+                    }
+                }
                 if let errorData = cloudObjectResponse.body,
                    let validatationError = try? JSONDecoder().decode(ValidationError.self, from: errorData),
                    let issues = validatationError.issues {
@@ -1125,6 +1157,66 @@ open class RioCloudObject {
                 }
             }
         }
+    }
+    
+    private func handleSpecialCase(
+        with options: RioCloudObjectOptions,
+        onSuccess: @escaping (RioCloudObjectResponse) -> Void,
+        onError: @escaping (RioCloudObjectError) -> Void) {
+            var options2 = options
+            options2.classID = self.classID
+            options2.instanceID = self.instanceID
+            options2.culture = options.culture == nil ? self.rio?.culture : options.culture
+            
+            let parameters: [String: Any] = options.body?.compactMapValues( { $0 }) ?? [:]
+            let headers = options.headers?.compactMapValues( { $0 } ) ?? [:]
+            
+            guard let rio = rio else {
+                return
+            }
+            
+            rio.send(
+                action: "rbs.core.request.CALL",
+                data: parameters,
+                headers: headers,
+                cloudObjectOptions: options2
+            ) { response in
+                if let objectResponse = response.first as? RioCloudObjectResponse {
+                    onSuccess(objectResponse)
+                } else {
+                    let errorResponse = RioCloudObjectResponse(statusCode: -1, headers: nil, body: response.first as? Data)
+                    onError(RioCloudObjectError(error: .parsingError, response: errorResponse))
+                }
+            } onError: { error in
+                if let error = error as? BaseErrorResponse, let cloudObjectResponse = error.cloudObjectResponse {
+                    if let statusCode = error.cloudObjectResponse?.statusCode, statusCode == 570 {
+                        let config = options2.retryConfig ?? (rio.config.retryConfig ?? RetryConfig())
+                        let remaining = config.count - 1
+                        rio.logger.log("Remaining count for retry -> \(remaining)")
+                        if remaining < 1 {
+                            let specialResponse = RioCloudObjectResponse(statusCode: 570, headers: nil, body: nil)
+                            onError(RioCloudObjectError(error: .methodReturnedError, response: specialResponse))
+                            return
+                        } else {
+                            let delay = config.delay * config.rate
+                            let newRetryConfig = RetryConfig(delay: delay, rate: config.rate, count: remaining)
+                            var newOptions = options2
+                            newOptions.retryConfig = newRetryConfig
+                            self.handleSpecialCase(with: newOptions, onSuccess: onSuccess, onError: onError)
+                            return
+                        }
+                    }
+                    if let errorData = cloudObjectResponse.body,
+                       let validatationError = try? JSONDecoder().decode(ValidationError.self, from: errorData),
+                       let issues = validatationError.issues {
+                        onError(RioCloudObjectError(error: .validationError(validationIssues: issues), response: cloudObjectResponse))
+                    } else if let moyaError = error.moyaError {
+                        onError(RioCloudObjectError(error: .moyaError(moyaError), response: cloudObjectResponse))
+                    } else {
+                        onError(RioCloudObjectError(error: .methodReturnedError, response: cloudObjectResponse))
+                    }
+                }
+            }
     }
     
     public func listInstances(
@@ -1276,6 +1368,7 @@ public struct RioCloudObjectOptions {
     public var body: [String: Any]?
     public var useLocal: Bool?
     public var culture: String?
+    public var retryConfig: RetryConfig?
     
     public init(
         classID: String? = nil,
@@ -1287,7 +1380,8 @@ public struct RioCloudObjectOptions {
         httpMethod: Moya.Method? = nil,
         body: [String: Any]? = nil,
         useLocal: Bool? = nil,
-        culture: String? = nil
+        culture: String? = nil,
+        retryConfig: RetryConfig? = nil
     ) {
         self.classID = classID
         self.instanceID = instanceID
@@ -1299,6 +1393,7 @@ public struct RioCloudObjectOptions {
         self.body = body
         self.useLocal = useLocal
         self.culture = culture == nil ? defaultCulture : culture
+        self.retryConfig = retryConfig == nil ? RetryConfig() : retryConfig
     }
 }
 
