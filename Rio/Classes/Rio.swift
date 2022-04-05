@@ -631,6 +631,7 @@ public class Rio {
         req.keyValue = cloudObjectOptions?.keyValue
         req.httpMethod = cloudObjectOptions?.httpMethod
         req.method = cloudObjectOptions?.method
+        req.queryString = cloudObjectOptions?.queryString
         
         var errorResponse: BaseErrorResponse?
         
