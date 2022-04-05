@@ -967,6 +967,7 @@ public class Rio {
 
             var objectData: Data?
             if let insDict = (try? JSONSerialization.jsonObject(with: data, options: .mutableContainers)) as? [String: Any],
+               insDict["response"] != nil,
                let insRespData = try? JSONSerialization.data(withJSONObject: insDict["response"] as Any, options: JSONSerialization.WritingOptions.prettyPrinted) {
                 objectData = insRespData
             }
@@ -1025,7 +1026,7 @@ public class Rio {
 
 // MARK: - RioCloudObject
 
-public class RioCloudObject {
+open class RioCloudObject {
     public struct State {
         public let user: RioCloudObjectState
         public let role: RioCloudObjectState
