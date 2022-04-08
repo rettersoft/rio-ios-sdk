@@ -1272,7 +1272,7 @@ public struct RioCloudObjectOptions {
     public var keyValue: (key: String, value: String)?
     public var method: String?
     public var headers: [String: String]?
-    public var queryString: [String: String]?
+    public var queryString: [String: Any]?
     public var httpMethod: Moya.Method?
     public var body: [String: Any]?
     public var useLocal: Bool?
@@ -1284,7 +1284,7 @@ public struct RioCloudObjectOptions {
         keyValue: (key: String, value: String)? = nil,
         method: String? = nil,
         headers: [String: String]? = nil,
-        queryString: [String: String]? = nil,
+        queryString: [String: Any]? = nil,
         httpMethod: Moya.Method? = nil,
         body: [String: Any]? = nil,
         useLocal: Bool? = nil,

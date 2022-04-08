@@ -9,6 +9,7 @@
 import Foundation
 import Moya
 import ObjectMapper
+import Alamofire
 
 
 var globalRioRegion:RioRegion = .euWest1
@@ -207,7 +208,7 @@ extension RioService: TargetType, AccessTokenAuthorizable {
         case .executeAction(let request):
             
             if isGetAction(request.actionName) || httpMethod == .get {
-                return .requestParameters(parameters: self.urlParameters, encoding: URLEncoding.default)
+                return .requestParameters(parameters: self.urlParameters, encoding: URLEncoding(destination: .queryString, arrayEncoding: .noBrackets, boolEncoding: .literal))
             }
             
             return .requestCompositeParameters(bodyParameters: self.body,
