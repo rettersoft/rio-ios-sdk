@@ -316,7 +316,7 @@ public class Rio {
     private var firebaseApp: FirebaseApp?
     fileprivate var db: Firestore?
     
-    private let logger: RioLogger
+    fileprivate let logger: RioLogger
     
     private var deltaTime: TimeInterval = 0
     
@@ -1096,6 +1096,10 @@ open class RioCloudObject {
         
         let parameters: [String: Any] = options.body?.compactMapValues( { $0 }) ?? [:]
         let headers = options.headers?.compactMapValues( { $0 } ) ?? [:]
+        
+        if let encodingWarning = parameters.toEncodableDictionary().1 {
+            rio?.logger.log(encodingWarning)
+        }
         
         guard let rio = rio else {
             return
