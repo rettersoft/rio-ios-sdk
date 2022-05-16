@@ -13,19 +13,22 @@ import FirebaseAuth
 let defaultCulture = "en-us"
 
 public enum RioRegion {
-    case euWest1, euWest1Beta
+    case euWest1With(url: String, firebaseOptions: RioFirebaseOptions?),
+         euWest1,
+         euWest1BetaWith(url: String, firebaseOptions: RioFirebaseOptions?),
+         euWest1Beta
     
-    var getUrl:String {
+    var getUrl: String {
         switch self {
-        case .euWest1: return "https://root.api.retter.io"
-        case .euWest1Beta: return "https://root.test-api.retter.io"
+        case .euWest1, .euWest1With: return "https://root.api.retter.io"
+        case .euWest1Beta, .euWest1BetaWith: return "https://root.test-api.retter.io"
         }
     }
     
-    var postUrl:String {
+    var postUrl: String {
         switch self {
-        case .euWest1: return "https://root.api.retter.io"
-        case .euWest1Beta: return "https://root.test-api.retter.io"
+        case .euWest1, .euWest1With: return "https://root.api.retter.io"
+        case .euWest1Beta, .euWest1BetaWith: return "https://root.test-api.retter.io"
         }
     }
     
@@ -33,28 +36,70 @@ public enum RioRegion {
         switch self {
         case .euWest1:
             return "api.retter.io"
+        case .euWest1With(let url, _):
+            return url
         case .euWest1Beta:
             return "test-api.retter.io"
+        case .euWest1BetaWith(let url, _):
+            return url
         }
     }
     
     var firebaseOptions: FirebaseOptions {
         switch self {
         case .euWest1:
-            let firebaseOptions = FirebaseOptions(googleAppID: "1:1060598260564:ios:e2e8d6ad8c297c1319dec1",
-                                                  gcmSenderID: "1060598260564")
-            firebaseOptions.projectID = "retterio"
-            firebaseOptions.apiKey = "AIzaSyAnUv1-qAZYj-MqT0qg-_ErsxJmu1gAOtg"
-            return firebaseOptions
+            return prodOptions
         case .euWest1Beta:
-            let firebaseOptions = FirebaseOptions(googleAppID: "1:814752823492:ios:6429462157e997a146f191",
-                                                  gcmSenderID: "814752823492")
-            firebaseOptions.projectID = "rtbs-c82e1"
-            firebaseOptions.apiKey = "AIzaSyCYKQHVjql92jRX350a7dEaxQUhgkSxiUE"
-            return firebaseOptions
-            
-            
+            return betaOptions
+        case .euWest1With(_, let options):
+            if let options = options {
+                let firebaseOptions = FirebaseOptions(googleAppID: options.googleAppID, gcmSenderID: options.gcmSenderID)
+                firebaseOptions.projectID = options.projectID
+                firebaseOptions.apiKey = options.apiKey
+                return firebaseOptions
+            } else {
+                return prodOptions
+            }
+        case .euWest1BetaWith(_, let options):
+            if let options = options {
+                let firebaseOptions = FirebaseOptions(googleAppID: options.googleAppID, gcmSenderID: options.gcmSenderID)
+                firebaseOptions.projectID = options.projectID
+                firebaseOptions.apiKey = options.apiKey
+                return firebaseOptions
+            } else {
+                return betaOptions
+            }
         }
+    }
+    
+    private var betaOptions: FirebaseOptions {
+        let firebaseOptions = FirebaseOptions(googleAppID: "1:814752823492:ios:6429462157e997a146f191",
+                                              gcmSenderID: "814752823492")
+        firebaseOptions.projectID = "rtbs-c82e1"
+        firebaseOptions.apiKey = "AIzaSyCYKQHVjql92jRX350a7dEaxQUhgkSxiUE"
+        return firebaseOptions
+    }
+    
+    private var prodOptions: FirebaseOptions {
+        let firebaseOptions = FirebaseOptions(googleAppID: "1:1060598260564:ios:e2e8d6ad8c297c1319dec1",
+                                              gcmSenderID: "1060598260564")
+        firebaseOptions.projectID = "retterio"
+        firebaseOptions.apiKey = "AIzaSyAnUv1-qAZYj-MqT0qg-_ErsxJmu1gAOtg"
+        return firebaseOptions
+    }
+}
+
+public struct RioFirebaseOptions {
+    let googleAppID: String
+    let gcmSenderID: String
+    let projectID: String
+    let apiKey: String
+    
+    public init (googleAppID: String, gcmSenderID: String, projectID: String, apiKey: String) {
+        self.googleAppID = googleAppID
+        self.gcmSenderID = gcmSenderID
+        self.projectID = projectID
+        self.apiKey = apiKey
     }
 }
 
