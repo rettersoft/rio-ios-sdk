@@ -12,7 +12,7 @@ import ObjectMapper
 import Alamofire
 
 
-var globalRioRegion:RioRegion = .euWest1
+var globalRioRegion: RioRegion = .euWest1
 
 let cloudObjectActions = ["rbs.core.request.INSTANCE", "rbs.core.request.CALL", "rio.core.request.LIST"]
 
