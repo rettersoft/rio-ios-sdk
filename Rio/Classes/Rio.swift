@@ -13,22 +13,21 @@ import FirebaseAuth
 let defaultCulture = "en-us"
 
 public enum RioRegion {
-    case euWest1With(url: String, firebaseOptions: RioFirebaseOptions?),
-         euWest1,
-         euWest1BetaWith(url: String, firebaseOptions: RioFirebaseOptions?),
-         euWest1Beta
+    case euWest1,
+         euWest1Beta,
+         customRegionWith(url: String, firebaseOptions: RioFirebaseOptions)
     
     var getUrl: String {
         switch self {
-        case .euWest1, .euWest1With: return "https://root.api.retter.io"
-        case .euWest1Beta, .euWest1BetaWith: return "https://root.test-api.retter.io"
+        case .euWest1, .customRegionWith: return "https://root.api.retter.io"
+        case .euWest1Beta: return "https://root.test-api.retter.io"
         }
     }
     
     var postUrl: String {
         switch self {
-        case .euWest1, .euWest1With: return "https://root.api.retter.io"
-        case .euWest1Beta, .euWest1BetaWith: return "https://root.test-api.retter.io"
+        case .euWest1, .customRegionWith: return "https://root.api.retter.io"
+        case .euWest1Beta: return "https://root.test-api.retter.io"
         }
     }
     
@@ -36,11 +35,9 @@ public enum RioRegion {
         switch self {
         case .euWest1:
             return "api.retter.io"
-        case .euWest1With(let url, _):
-            return url
         case .euWest1Beta:
             return "test-api.retter.io"
-        case .euWest1BetaWith(let url, _):
+        case .customRegionWith(let url, _):
             return url
         }
     }
@@ -51,27 +48,14 @@ public enum RioRegion {
             return prodOptions
         case .euWest1Beta:
             return betaOptions
-        case .euWest1With(_, let options):
-            if let options = options {
-                let firebaseOptions = FirebaseOptions(googleAppID: options.googleAppID, gcmSenderID: options.gcmSenderID)
-                firebaseOptions.projectID = options.projectID
-                firebaseOptions.apiKey = options.apiKey
-                return firebaseOptions
-            } else {
-                return prodOptions
-            }
-        case .euWest1BetaWith(_, let options):
-            if let options = options {
-                let firebaseOptions = FirebaseOptions(googleAppID: options.googleAppID, gcmSenderID: options.gcmSenderID)
-                firebaseOptions.projectID = options.projectID
-                firebaseOptions.apiKey = options.apiKey
-                return firebaseOptions
-            } else {
-                return betaOptions
-            }
+        case .customRegionWith(_, let options):
+            let firebaseOptions = FirebaseOptions(googleAppID: options.googleAppID, gcmSenderID: options.gcmSenderID)
+            firebaseOptions.projectID = options.projectID
+            firebaseOptions.apiKey = options.apiKey
+            return firebaseOptions
         }
     }
-    
+        
     private var betaOptions: FirebaseOptions {
         let firebaseOptions = FirebaseOptions(googleAppID: "1:814752823492:ios:6429462157e997a146f191",
                                               gcmSenderID: "814752823492")
