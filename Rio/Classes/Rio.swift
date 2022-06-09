@@ -215,7 +215,7 @@ enum RioKeychainKey {
     var keyName: String {
         get {
             switch self {
-            case .token: return "io.rtbs.token"
+            case .token: return "io.retter.token"
             }
         }
     }
@@ -412,8 +412,9 @@ public class Rio {
                 "core-test.rettermobile.com": pinningConfig,
                 "core-test.rtbs.io": pinningConfig,
                 "core-internal.rtbs.io": pinningConfig,
-                "core-internal-beta.rtbs.io": pinningConfig
-                
+                "core-internal-beta.rtbs.io": pinningConfig,
+                "api.retter.io": pinningConfig,
+                "test-api.retter.io": pinningConfig
             ]
         ] as [String: Any]
         
