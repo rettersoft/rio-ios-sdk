@@ -968,16 +968,15 @@ public class Rio {
         let headers = options2.headers?.compactMapValues( { $0 } ) ?? [:]
         
         if (options2.useLocal ?? false) && options2.instanceID != nil {
-            onSuccess(RioCloudObject(
-                projectID: self.projectId,
-                classID: classId,
-                instanceID: options2.instanceID!,
-                userID: "",
-                userIdentity: "",
-                rio: self,
-                isLocal: true
-            ))
-            return
+            let object = cloudObjects.last(where: { object in
+                object.instanceID == options2.instanceID &&
+                object.classID == options2.classID
+            })
+            
+            if let localObject = object {
+                onSuccess(localObject)
+                return
+            }
         }
         
         send(
@@ -1102,15 +1101,11 @@ open class RioCloudObject {
         self.methods = methods
         self.isNewInstance = isNewInstance
         
-        if !isLocal {
-            state = State(
-                user: RioCloudObjectState(projectID: projectID, classID: classID, instanceID: instanceID, userID: userID, userIdentity: userIdentity, state: .user, db: db),
-                role: RioCloudObjectState(projectID: projectID, classID: classID, instanceID: instanceID, userID: userID, userIdentity: userIdentity, state: .role, db: db),
-                public: RioCloudObjectState(projectID: projectID, classID: classID, instanceID: instanceID, userID: userID, userIdentity: userIdentity, state: .public, db: db)
-            )
-        } else {
-            state = nil
-        }
+        state = State(
+            user: RioCloudObjectState(projectID: projectID, classID: classID, instanceID: instanceID, userID: userID, userIdentity: userIdentity, state: .user, db: db),
+            role: RioCloudObjectState(projectID: projectID, classID: classID, instanceID: instanceID, userID: userID, userIdentity: userIdentity, state: .role, db: db),
+            public: RioCloudObjectState(projectID: projectID, classID: classID, instanceID: instanceID, userID: userID, userIdentity: userIdentity, state: .public, db: db)
+        )
     }
     
     public func call(
