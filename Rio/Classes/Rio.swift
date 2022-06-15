@@ -967,14 +967,35 @@ public class Rio {
         let parameters: [String: Any] = options2.body?.compactMapValues( { $0 }) ?? [:]
         let headers = options2.headers?.compactMapValues( { $0 } ) ?? [:]
         
-        if (options2.useLocal ?? false) && options2.instanceID != nil {
-            let object = cloudObjects.last(where: { object in
-                object.instanceID == options2.instanceID &&
-                object.classID == options2.classID
-            })
+        if (options2.useLocal ?? false) &&
+            options2.instanceID != nil &&
+            options2.classID != nil {
             
-            if let localObject = object {
-                onSuccess(localObject)
+            var userIdentity: String?
+            var userId: String?
+            if let data = self.keychain.getData(RioKeychainKey.token.keyName),
+               let json = try? JSONSerialization.jsonObject(with: data, options: []) {
+                if let storedTokenData = Mapper<RioTokenData>().map(JSONObject: json), let accessToken = storedTokenData.accessToken {
+                    let jwt = try! decode(jwt: accessToken)
+                    if let id = jwt.claim(name: "userId").string {
+                        userId = id
+                    }
+                    if let identity = jwt.claim(name: "identity").string {
+                        userIdentity = identity
+                    }
+                }
+            }
+            
+            if userIdentity != nil, userId != nil {
+                onSuccess(RioCloudObject(
+                    projectID: self.projectId,
+                    classID: classId,
+                    instanceID: options2.instanceID!,
+                    userID: userId ?? "",
+                    userIdentity: userIdentity ?? "",
+                    rio: self,
+                    isLocal: true
+                ))
                 return
             }
         }
