@@ -1,18 +1,16 @@
-# This is a basic workflow to help you get started with Actions
-
 name: CI
 on:
   push:
-    branches:
-    - main
+    tags:
+    - '*'
     
 jobs:
   build:
     runs-on: macOS-latest
     steps:
       - uses: actions/checkout@v1
-      - name: Publish to CocoaPod register
-        env:
-          COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }} 
+      - name: Publish to CocoaPods 
         run: |
           pod trunk push --allow-warnings Rio.podspec 
+        env:
+          COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
