@@ -202,10 +202,20 @@ extension RioService: TargetType, AccessTokenAuthorizable {
                 }
                 return URL(string: globalRioRegion.postUrl)!
             } else {
-                return URL(string: "https://\(request.projectId!).\(globalRioRegion.apiURL)")!
+                switch globalRioRegion {
+                case .euWest1, .euWest1Beta:
+                    return URL(string: "https://\(request.projectId!).\(globalRioRegion.apiURL)")!
+                case .customRegionWith(_, _):
+                    return URL(string: "https://\(globalRioRegion.apiURL)")!
+                }
             }
         default:
-            return URL(string: "https://root.\(globalRioRegion.apiURL)")!
+            switch globalRioRegion {
+            case .euWest1, .euWest1Beta:
+                return URL(string: "https://root.\(globalRioRegion.apiURL)")!
+            case .customRegionWith(_, _):
+                return URL(string: "https://\(globalRioRegion.apiURL)")!
+            }
         }
     }
     var path: String { return self.endPoint }
@@ -243,7 +253,7 @@ extension RioService: TargetType, AccessTokenAuthorizable {
         
         var headers: [String: String] = [:]
         headers["Content-Type"] = "application/json"
-        headers["x-rbs-sdk-client"] = "ios"
+        headers["x-rio-sdk-client"] = "ios"
         
         switch self {
         case .executeAction(let request):

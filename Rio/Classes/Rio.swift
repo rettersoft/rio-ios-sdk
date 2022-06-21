@@ -15,7 +15,7 @@ let defaultCulture = "en-us"
 public enum RioRegion {
     case euWest1,
          euWest1Beta,
-         customRegionWith(url: String, firebaseOptions: RioFirebaseOptions)
+         customRegionWith(url: String, firebaseOptions: RioFirebaseOptions? = nil)
     
     var getUrl: String {
         switch self {
@@ -49,10 +49,13 @@ public enum RioRegion {
         case .euWest1Beta:
             return betaOptions
         case .customRegionWith(_, let options):
-            let firebaseOptions = FirebaseOptions(googleAppID: options.googleAppID, gcmSenderID: options.gcmSenderID)
-            firebaseOptions.projectID = options.projectID
-            firebaseOptions.apiKey = options.apiKey
-            return firebaseOptions
+            if let options = options {
+                let firebaseOptions = FirebaseOptions(googleAppID: options.googleAppID, gcmSenderID: options.gcmSenderID)
+                firebaseOptions.projectID = options.projectID
+                firebaseOptions.apiKey = options.apiKey
+                return firebaseOptions
+            }
+            return prodOptions
         }
     }
         
@@ -190,6 +193,7 @@ struct RioTokenData: Mappable, Decodable {
         refreshToken <- map["refreshToken"]
         firebaseToken <- map["firebaseToken"]
         deltaTime <- map["deltaTime"]
+        firebase <- map["firebase"]
     }
 }
 
@@ -288,6 +292,35 @@ public class Rio {
                 if let tokenData = Mapper<RioTokenData>().map(JSONObject: json),
                    let accessToken = tokenData.accessToken {
                     
+                    if let googleAppID = tokenData.firebase?.envs?.iosAppId,
+                       let gcmSenderID = tokenData.firebase?.envs?.gcmSenderId,
+                       let firebaseProjectID = tokenData.firebase?.projectId,
+                       let apiKey = tokenData.firebase?.apiKey {
+
+                        if FirebaseApp.app(name: "rio") == nil {
+                            let options = initFirebase(
+                                with: RioFirebaseOptions(
+                                    googleAppID: googleAppID,
+                                    gcmSenderID: gcmSenderID,
+                                    projectID: firebaseProjectID,
+                                    apiKey: apiKey
+                                )
+                            )
+
+                            FirebaseApp.configure(name: "rio", options: options)
+                        }
+                        
+                        guard let app = FirebaseApp.app(name: "rio") else {
+                            fatalError()
+                        }
+                        
+                        firebaseApp = app
+                        db = Firestore.firestore(app: app)
+                    } else {
+                        signOut()
+                        fatalError("There is a problem with firebase options on the Rio token!")
+                    }
+                    
                     let jwt = try! decode(jwt: accessToken)
                     if let userId = jwt.claim(name: "userId").string, let anonymous = jwt.claim(name: "anonymous").rawValue as? Bool {
                         
@@ -357,18 +390,6 @@ public class Rio {
         } else {
             self.setupTrustKit()
         }
-        
-        if let options = config.region?.firebaseOptions {
-            FirebaseApp.configure(name: "rio", options: options)
-        }
-        
-        guard let app = FirebaseApp.app(name: "rio") else {
-            fatalError()
-        }
-        
-        self.firebaseApp = app
-        self.db = Firestore.firestore(app: app)
-        
         
         self.config = config
         self.projectId = config.projectId
@@ -558,6 +579,28 @@ public class Rio {
                    let resp = try? response.map(RioTokenResponse.self) {
                     self?.checkForDeltaTime(for: resp.response.accessToken)
                     retVal = resp.response
+                    
+                    if let googleAppID = resp.response.firebase?.envs?.iosAppId,
+                       let gcmSenderID = resp.response.firebase?.envs?.gcmSenderId,
+                       let firebaseProjectID = resp.response.firebase?.projectId,
+                       let apiKey = resp.response.firebase?.apiKey {
+                        if let options = self?.initFirebase(with: RioFirebaseOptions(googleAppID: googleAppID, gcmSenderID: gcmSenderID, projectID: firebaseProjectID, apiKey: apiKey)) {
+                            if FirebaseApp.app(name: "rio") == nil {
+                                FirebaseApp.configure(name: "rio", options: options)
+                            }
+                        } else {
+                            fatalError()
+                        }
+                        
+                        guard let app = FirebaseApp.app(name: "rio") else {
+                            fatalError()
+                        }
+                        
+                        self?.firebaseApp = app
+                        self?.db = Firestore.firestore(app: app)
+                    } else {
+                        fatalError("There is a problem with firebase options on the Rio token!!!")
+                    }
                 } else {
                     errorResponse = BaseErrorResponse()
                     errorResponse?.cloudObjectResponse = RioCloudObjectResponse(statusCode: response.statusCode, headers: nil, body: nil)
@@ -638,6 +681,15 @@ public class Rio {
         }
         
         deltaTime =  TimeInterval(serverTime) - Date().timeIntervalSince1970
+    }
+    
+    private func initFirebase(with options: RioFirebaseOptions) -> FirebaseOptions {
+        let firebaseOptions = FirebaseOptions(googleAppID: options.googleAppID,
+                                              gcmSenderID: options.gcmSenderID)
+        firebaseOptions.projectID = options.projectID
+        firebaseOptions.apiKey = options.apiKey
+        
+        return firebaseOptions
     }
     
     private func executeAction(
@@ -1366,16 +1418,36 @@ public struct RioCloudObjectMethod: Decodable {
     let tag: String?
 }
 
-struct CloudOption: Decodable {
+struct CloudOption: Decodable, Mappable {
     var customToken: String?
     var projectId: String?
     var apiKey: String?
     var envs: RioFirebaseEnv?
+    
+    init?(map: Map) {
+        
+    }
+    
+    mutating func mapping(map: Map) {
+        customToken <- map["customToken"]
+        projectId <- map["projectId"]
+        apiKey <- map["apiKey"]
+        envs <- map["envs"]
+    }
 }
 
-struct RioFirebaseEnv: Decodable {
+struct RioFirebaseEnv: Decodable, Mappable {
     var iosAppId: String?
     var gcmSenderId: String?
+    
+    init?(map: Map) {
+        
+    }
+    
+    mutating func mapping(map: Map) {
+        iosAppId <- map["iosAppId"]
+        gcmSenderId <- map["gcmSenderId"]
+    }
 }
 
 
