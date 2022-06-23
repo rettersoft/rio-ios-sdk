@@ -292,34 +292,7 @@ public class Rio {
                 if let tokenData = Mapper<RioTokenData>().map(JSONObject: json),
                    let accessToken = tokenData.accessToken {
                     
-                    if let googleAppID = tokenData.firebase?.envs?.iosAppId,
-                       let gcmSenderID = tokenData.firebase?.envs?.gcmSenderId,
-                       let firebaseProjectID = tokenData.firebase?.projectId,
-                       let apiKey = tokenData.firebase?.apiKey {
-
-                        if FirebaseApp.app(name: "rio") == nil {
-                            let options = initFirebase(
-                                with: RioFirebaseOptions(
-                                    googleAppID: googleAppID,
-                                    gcmSenderID: gcmSenderID,
-                                    projectID: firebaseProjectID,
-                                    apiKey: apiKey
-                                )
-                            )
-
-                            FirebaseApp.configure(name: "rio", options: options)
-                        }
-                        
-                        guard let app = FirebaseApp.app(name: "rio") else {
-                            fatalError()
-                        }
-                        
-                        firebaseApp = app
-                        db = Firestore.firestore(app: app)
-                    } else {
-                        signOut()
-                        fatalError("There is a problem with firebase options on the Rio token!")
-                    }
+                    configureFirebase(with: tokenData)
                     
                     let jwt = try! decode(jwt: accessToken)
                     if let userId = jwt.claim(name: "userId").string, let anonymous = jwt.claim(name: "anonymous").rawValue as? Bool {
@@ -580,27 +553,7 @@ public class Rio {
                     self?.checkForDeltaTime(for: resp.response.accessToken)
                     retVal = resp.response
                     
-                    if let googleAppID = resp.response.firebase?.envs?.iosAppId,
-                       let gcmSenderID = resp.response.firebase?.envs?.gcmSenderId,
-                       let firebaseProjectID = resp.response.firebase?.projectId,
-                       let apiKey = resp.response.firebase?.apiKey {
-                        if let options = self?.initFirebase(with: RioFirebaseOptions(googleAppID: googleAppID, gcmSenderID: gcmSenderID, projectID: firebaseProjectID, apiKey: apiKey)) {
-                            if FirebaseApp.app(name: "rio") == nil {
-                                FirebaseApp.configure(name: "rio", options: options)
-                            }
-                        } else {
-                            fatalError()
-                        }
-                        
-                        guard let app = FirebaseApp.app(name: "rio") else {
-                            fatalError()
-                        }
-                        
-                        self?.firebaseApp = app
-                        self?.db = Firestore.firestore(app: app)
-                    } else {
-                        fatalError("There is a problem with firebase options on the Rio token!!!")
-                    }
+                    self?.configureFirebase(with: resp.response)
                 } else {
                     errorResponse = BaseErrorResponse()
                     errorResponse?.cloudObjectResponse = RioCloudObjectResponse(statusCode: response.statusCode, headers: nil, body: nil)
@@ -683,13 +636,44 @@ public class Rio {
         deltaTime =  TimeInterval(serverTime) - Date().timeIntervalSince1970
     }
     
-    private func initFirebase(with options: RioFirebaseOptions) -> FirebaseOptions {
+    private func getFirebaseOptions(with options: RioFirebaseOptions) -> FirebaseOptions {
         let firebaseOptions = FirebaseOptions(googleAppID: options.googleAppID,
                                               gcmSenderID: options.gcmSenderID)
         firebaseOptions.projectID = options.projectID
         firebaseOptions.apiKey = options.apiKey
         
         return firebaseOptions
+    }
+    
+    private func configureFirebase(with tokenData: RioTokenData) {
+        if let googleAppID = tokenData.firebase?.envs?.iosAppId,
+           let gcmSenderID = tokenData.firebase?.envs?.gcmSenderId,
+           let firebaseProjectID = tokenData.firebase?.projectId,
+           let apiKey = tokenData.firebase?.apiKey {
+
+            if FirebaseApp.app(name: "rio") == nil {
+                let options = getFirebaseOptions(
+                    with: RioFirebaseOptions(
+                        googleAppID: googleAppID,
+                        gcmSenderID: gcmSenderID,
+                        projectID: firebaseProjectID,
+                        apiKey: apiKey
+                    )
+                )
+
+                FirebaseApp.configure(name: "rio", options: options)
+            }
+            
+            guard let app = FirebaseApp.app(name: "rio") else {
+                fatalError()
+            }
+            
+            firebaseApp = app
+            db = Firestore.firestore(app: app)
+        } else {
+            signOut()
+            fatalError("There is a problem with firebase options on the Rio token!")
+        }
     }
     
     private func executeAction(
