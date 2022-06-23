@@ -431,6 +431,8 @@ public class Rio {
                let accessTokenExpiresAt = tokenData.accessTokenExpiresAt,
                let projectId = tokenData.projectId {
                 
+                configureFirebase(with: tokenData)
+                
                 deltaTime = tokenData.deltaTime ?? 0
                 
                 if(projectId == self.projectId) {
