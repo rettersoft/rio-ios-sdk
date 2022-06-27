@@ -667,14 +667,14 @@ public class Rio {
             }
             
             guard let app = FirebaseApp.app(name: "rio") else {
-                fatalError()
+                logger.log("⚠️ A problem occured while configuring the Firebase app.")
+                return
             }
             
             firebaseApp = app
             db = Firestore.firestore(app: app)
         } else {
-            signOut()
-            fatalError("There is a problem with firebase options on the Rio token!")
+            logger.log("⚠️ No info related to Firebase has been found on the token - to use Firebase extensively, please consult to Rio team to configure Firebase credentials.")
         }
     }
     
