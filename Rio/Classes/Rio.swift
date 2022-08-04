@@ -99,6 +99,7 @@ public struct RioConfig {
     var sslPinningEnabled: Bool?
     var isLoggingEnabled: Bool?
     var culture: String? = defaultCulture
+    var retryConfig: RetryConfig?
     
     public init(
         projectId: String,
@@ -108,7 +109,8 @@ public struct RioConfig {
         region: RioRegion? = nil,
         sslPinningEnabled: Bool? = nil,
         isLoggingEnabled: Bool = false,
-        culture: String? = nil
+        culture: String? = nil,
+        retryConfig: RetryConfig? = nil
     ) {
         self.projectId = projectId
         self.secretKey = secretKey
@@ -118,6 +120,19 @@ public struct RioConfig {
         self.sslPinningEnabled = sslPinningEnabled
         self.isLoggingEnabled = isLoggingEnabled
         self.culture = culture == nil ? defaultCulture : culture
+        self.retryConfig = retryConfig == nil ? RetryConfig() : retryConfig
+    }
+}
+
+public struct RetryConfig {
+    let delay: Double // in milliseconds
+    let rate: Double
+    let count: Int
+    
+    public init(delay: Double = 50, rate: Double = 1.5, count: Int = 3) {
+        self.delay = delay
+        self.rate = rate
+        self.count = count
     }
 }
 
@@ -346,7 +361,7 @@ public class Rio {
     
     private let keychain = KeychainSwift()
     
-    private var config: RioConfig!
+    fileprivate var config: RioConfig!
     
     private var firebaseApp: FirebaseApp?
     fileprivate var db: Firestore?
@@ -1167,11 +1182,15 @@ open class RioCloudObject {
         )
     }
     
+    private var stamps: [TimeInterval] = []
+    
     public func call(
         with options: RioCloudObjectOptions,
         onSuccess: @escaping (RioCloudObjectResponse) -> Void,
         onError: @escaping (RioCloudObjectError) -> Void
     ) {
+        
+        stamps.append(Date().timeIntervalSince1970)
         
         var options2 = options
         options2.classID = self.classID
@@ -1201,8 +1220,29 @@ open class RioCloudObject {
                 let errorResponse = RioCloudObjectResponse(statusCode: -1, headers: nil, body: response.first as? Data)
                 onError(RioCloudObjectError(error: .parsingError, response: errorResponse))
             }
-        } onError: { (error) in
+        } onError: { [weak self] (error) in
             if let error = error as? BaseErrorResponse, let cloudObjectResponse = error.cloudObjectResponse {
+                if let statusCode = error.cloudObjectResponse?.statusCode, statusCode == 570 {
+                    let config = options2.retryConfig ?? (rio.config.retryConfig ?? RetryConfig())
+                    let remaining = config.count - 1
+                    rio.logger.log("Remaining count for retry -> \(remaining)")
+                    if remaining < 1 {
+                        if let stamps = self?.stamps {
+                        }
+                        let specialResponse = RioCloudObjectResponse(statusCode: 570, headers: nil, body: nil)
+                        onError(RioCloudObjectError(error: .methodReturnedError, response: specialResponse))
+                        return
+                    } else {
+                        let delay = config.delay * config.rate
+                        let newRetryConfig = RetryConfig(delay: delay, rate: config.rate, count: remaining)
+                        var newOptions = options2
+                        newOptions.retryConfig = newRetryConfig
+                        DispatchQueue.main.asyncAfter(deadline: .now() + delay/Double(1000)) {
+                            self?.call(with: newOptions, onSuccess: onSuccess, onError: onError)
+                        }
+                        return
+                    }
+                }
                 if let errorData = cloudObjectResponse.body,
                    let validatationError = try? JSONDecoder().decode(ValidationError.self, from: errorData),
                    let issues = validatationError.issues {
@@ -1365,6 +1405,7 @@ public struct RioCloudObjectOptions {
     public var body: [String: Any]?
     public var useLocal: Bool?
     public var culture: String?
+    public var retryConfig: RetryConfig?
     
     public init(
         classID: String? = nil,
@@ -1376,7 +1417,8 @@ public struct RioCloudObjectOptions {
         httpMethod: Moya.Method? = nil,
         body: [String: Any]? = nil,
         useLocal: Bool? = nil,
-        culture: String? = nil
+        culture: String? = nil,
+        retryConfig: RetryConfig? = nil
     ) {
         self.classID = classID
         self.instanceID = instanceID
@@ -1388,6 +1430,7 @@ public struct RioCloudObjectOptions {
         self.body = body
         self.useLocal = useLocal
         self.culture = culture == nil ? defaultCulture : culture
+        self.retryConfig = retryConfig
     }
 }
 
