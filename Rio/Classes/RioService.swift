@@ -9,9 +9,10 @@
 import Foundation
 import Moya
 import ObjectMapper
+import Alamofire
 
 
-var globalRioRegion:RioRegion = .euWest1
+var globalRioRegion: RioRegion = .euWest1
 
 let cloudObjectActions = ["rbs.core.request.INSTANCE", "rbs.core.request.CALL", "rio.core.request.LIST"]
 
@@ -108,6 +109,19 @@ enum RioService {
                 
                 parameters["__platform"] = "IOS"
                 
+                if request.httpMethod == .get {
+                    if let payload = request.payload, !payload.isEmpty {
+                        let encodablePayload = payload.toEncodableDictionary().0
+                        if let data = try? JSONSerialization.data(withJSONObject: encodablePayload, options: .fragmentsAllowed),
+                           let base64 = data.base64EncodedString().addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+                            parameters["data"] = base64
+                            parameters["__isbase64"] = true
+                        }
+                    } else {
+                        parameters["__isbase64"] = false
+                    }
+                }
+                
                 return parameters
             }
             
@@ -188,10 +202,20 @@ extension RioService: TargetType, AccessTokenAuthorizable {
                 }
                 return URL(string: globalRioRegion.postUrl)!
             } else {
-                return URL(string: "https://\(request.projectId!).\(globalRioRegion.apiURL)")!
+                switch globalRioRegion {
+                case .euWest1, .euWest1Beta:
+                    return URL(string: "https://\(request.projectId!).\(globalRioRegion.apiURL)")!
+                case .customRegionWith(_, _):
+                    return URL(string: "https://\(globalRioRegion.apiURL)")!
+                }
             }
         default:
-            return URL(string: "https://root.\(globalRioRegion.apiURL)")!
+            switch globalRioRegion {
+            case .euWest1, .euWest1Beta:
+                return URL(string: "https://root.\(globalRioRegion.apiURL)")!
+            case .customRegionWith(_, _):
+                return URL(string: "https://\(globalRioRegion.apiURL)")!
+            }
         }
     }
     var path: String { return self.endPoint }
@@ -207,7 +231,7 @@ extension RioService: TargetType, AccessTokenAuthorizable {
         case .executeAction(let request):
             
             if isGetAction(request.actionName) || httpMethod == .get {
-                return .requestParameters(parameters: self.urlParameters, encoding: URLEncoding.default)
+                return .requestParameters(parameters: self.urlParameters, encoding: URLEncoding(destination: .queryString, arrayEncoding: .noBrackets, boolEncoding: .literal))
             }
             
             return .requestCompositeParameters(bodyParameters: self.body,
@@ -229,7 +253,7 @@ extension RioService: TargetType, AccessTokenAuthorizable {
         
         var headers: [String: String] = [:]
         headers["Content-Type"] = "application/json"
-        headers["x-rbs-sdk-client"] = "ios"
+        headers["x-rio-sdk-client"] = "ios"
         
         switch self {
         case .executeAction(let request):
@@ -273,5 +297,31 @@ final class CachePolicyPlugin: PluginType {
         }
         
         return request
+    }
+}
+
+extension Encodable {
+    var dict: [String: Any]? {
+        guard let data = try? JSONEncoder().encode(self) else {
+            return nil
+        }
+        return (try? JSONSerialization.jsonObject(with: data, options: .allowFragments)).flatMap { $0 as? [String: Any] }
+    }
+}
+
+extension Dictionary where Key == String {
+    func toEncodableDictionary() -> ([String: Any], String?) {
+        var newDict: [String: Any] = [:]
+        var errorMessage: String?
+        for (key, value) in self {
+            if JSONSerialization.isValidJSONObject([key: value]) {
+                newDict[key] = value
+            } else if let encodableValue = value as? Encodable {
+                newDict[key] = encodableValue.dict
+            } else {
+                errorMessage = "⚠️ An unencodable object (i.e., for the key '\(key)') exists in the payload, please make sure to pass encodable objects into the payload!"
+            }
+        }
+        return (newDict, errorMessage)
     }
 }

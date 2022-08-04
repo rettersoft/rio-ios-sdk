@@ -13,18 +13,20 @@ import FirebaseAuth
 let defaultCulture = "en-us"
 
 public enum RioRegion {
-    case euWest1, euWest1Beta
+    case euWest1,
+         euWest1Beta,
+         customRegionWith(url: String, firebaseOptions: RioFirebaseOptions? = nil)
     
-    var getUrl:String {
+    var getUrl: String {
         switch self {
-        case .euWest1: return "https://root.api.retter.io"
+        case .euWest1, .customRegionWith: return "https://root.api.retter.io"
         case .euWest1Beta: return "https://root.test-api.retter.io"
         }
     }
     
-    var postUrl:String {
+    var postUrl: String {
         switch self {
-        case .euWest1: return "https://root.api.retter.io"
+        case .euWest1, .customRegionWith: return "https://root.api.retter.io"
         case .euWest1Beta: return "https://root.test-api.retter.io"
         }
     }
@@ -35,26 +37,56 @@ public enum RioRegion {
             return "api.retter.io"
         case .euWest1Beta:
             return "test-api.retter.io"
+        case .customRegionWith(let url, _):
+            return url
         }
     }
     
     var firebaseOptions: FirebaseOptions {
         switch self {
         case .euWest1:
-            let firebaseOptions = FirebaseOptions(googleAppID: "1:1060598260564:ios:e2e8d6ad8c297c1319dec1",
-                                                  gcmSenderID: "1060598260564")
-            firebaseOptions.projectID = "retterio"
-            firebaseOptions.apiKey = "AIzaSyAnUv1-qAZYj-MqT0qg-_ErsxJmu1gAOtg"
-            return firebaseOptions
+            return prodOptions
         case .euWest1Beta:
-            let firebaseOptions = FirebaseOptions(googleAppID: "1:814752823492:ios:6429462157e997a146f191",
-                                                  gcmSenderID: "814752823492")
-            firebaseOptions.projectID = "rtbs-c82e1"
-            firebaseOptions.apiKey = "AIzaSyCYKQHVjql92jRX350a7dEaxQUhgkSxiUE"
-            return firebaseOptions
-            
-            
+            return betaOptions
+        case .customRegionWith(_, let options):
+            if let options = options {
+                let firebaseOptions = FirebaseOptions(googleAppID: options.googleAppID, gcmSenderID: options.gcmSenderID)
+                firebaseOptions.projectID = options.projectID
+                firebaseOptions.apiKey = options.apiKey
+                return firebaseOptions
+            }
+            return prodOptions
         }
+    }
+        
+    private var betaOptions: FirebaseOptions {
+        let firebaseOptions = FirebaseOptions(googleAppID: "1:814752823492:ios:6429462157e997a146f191",
+                                              gcmSenderID: "814752823492")
+        firebaseOptions.projectID = "rtbs-c82e1"
+        firebaseOptions.apiKey = "AIzaSyCYKQHVjql92jRX350a7dEaxQUhgkSxiUE"
+        return firebaseOptions
+    }
+    
+    private var prodOptions: FirebaseOptions {
+        let firebaseOptions = FirebaseOptions(googleAppID: "1:1060598260564:ios:e2e8d6ad8c297c1319dec1",
+                                              gcmSenderID: "1060598260564")
+        firebaseOptions.projectID = "retterio"
+        firebaseOptions.apiKey = "AIzaSyAnUv1-qAZYj-MqT0qg-_ErsxJmu1gAOtg"
+        return firebaseOptions
+    }
+}
+
+public struct RioFirebaseOptions {
+    let googleAppID: String
+    let gcmSenderID: String
+    let projectID: String
+    let apiKey: String
+    
+    public init (googleAppID: String, gcmSenderID: String, projectID: String, apiKey: String) {
+        self.googleAppID = googleAppID
+        self.gcmSenderID = gcmSenderID
+        self.projectID = projectID
+        self.apiKey = apiKey
     }
 }
 
@@ -176,6 +208,7 @@ struct RioTokenData: Mappable, Decodable {
         refreshToken <- map["refreshToken"]
         firebaseToken <- map["firebaseToken"]
         deltaTime <- map["deltaTime"]
+        firebase <- map["firebase"]
     }
 }
 
@@ -201,7 +234,7 @@ enum RioKeychainKey {
     var keyName: String {
         get {
             switch self {
-            case .token: return "io.rtbs.token"
+            case .token: return "io.retter.token"
             }
         }
     }
@@ -274,6 +307,8 @@ public class Rio {
                 if let tokenData = Mapper<RioTokenData>().map(JSONObject: json),
                    let accessToken = tokenData.accessToken {
                     
+                    configureFirebase(with: tokenData)
+                    
                     let jwt = try! decode(jwt: accessToken)
                     if let userId = jwt.claim(name: "userId").string, let anonymous = jwt.claim(name: "anonymous").rawValue as? Bool {
                         
@@ -344,18 +379,6 @@ public class Rio {
             self.setupTrustKit()
         }
         
-        if let options = config.region?.firebaseOptions {
-            FirebaseApp.configure(name: "rio", options: options)
-        }
-        
-        guard let app = FirebaseApp.app(name: "rio") else {
-            fatalError()
-        }
-        
-        self.firebaseApp = app
-        self.db = Firestore.firestore(app: app)
-        
-        
         self.config = config
         self.projectId = config.projectId
         globalRioRegion = config.region!
@@ -398,8 +421,9 @@ public class Rio {
                 "core-test.rettermobile.com": pinningConfig,
                 "core-test.rtbs.io": pinningConfig,
                 "core-internal.rtbs.io": pinningConfig,
-                "core-internal-beta.rtbs.io": pinningConfig
-                
+                "core-internal-beta.rtbs.io": pinningConfig,
+                "api.retter.io": pinningConfig,
+                "test-api.retter.io": pinningConfig
             ]
         ] as [String: Any]
         
@@ -421,6 +445,8 @@ public class Rio {
                let refreshTokenExpiresAt = tokenData.refreshTokenExpiresAt,
                let accessTokenExpiresAt = tokenData.accessTokenExpiresAt,
                let projectId = tokenData.projectId {
+                
+                configureFirebase(with: tokenData)
                 
                 deltaTime = tokenData.deltaTime ?? 0
                 
@@ -543,6 +569,8 @@ public class Rio {
                    let resp = try? response.map(RioTokenResponse.self) {
                     self?.checkForDeltaTime(for: resp.response.accessToken)
                     retVal = resp.response
+                    
+                    self?.configureFirebase(with: resp.response)
                 } else {
                     errorResponse = BaseErrorResponse()
                     errorResponse?.cloudObjectResponse = RioCloudObjectResponse(statusCode: response.statusCode, headers: nil, body: nil)
@@ -623,6 +651,46 @@ public class Rio {
         }
         
         deltaTime =  TimeInterval(serverTime) - Date().timeIntervalSince1970
+    }
+    
+    private func getFirebaseOptions(with options: RioFirebaseOptions) -> FirebaseOptions {
+        let firebaseOptions = FirebaseOptions(googleAppID: options.googleAppID,
+                                              gcmSenderID: options.gcmSenderID)
+        firebaseOptions.projectID = options.projectID
+        firebaseOptions.apiKey = options.apiKey
+        
+        return firebaseOptions
+    }
+    
+    private func configureFirebase(with tokenData: RioTokenData) {
+        if let googleAppID = tokenData.firebase?.envs?.iosAppId,
+           let gcmSenderID = tokenData.firebase?.envs?.gcmSenderId,
+           let firebaseProjectID = tokenData.firebase?.projectId,
+           let apiKey = tokenData.firebase?.apiKey {
+
+            if FirebaseApp.app(name: "rio") == nil {
+                let options = getFirebaseOptions(
+                    with: RioFirebaseOptions(
+                        googleAppID: googleAppID,
+                        gcmSenderID: gcmSenderID,
+                        projectID: firebaseProjectID,
+                        apiKey: apiKey
+                    )
+                )
+
+                FirebaseApp.configure(name: "rio", options: options)
+            }
+            
+            guard let app = FirebaseApp.app(name: "rio") else {
+                logger.log("⚠️ A problem occured while configuring the Firebase app.")
+                return
+            }
+            
+            firebaseApp = app
+            db = Firestore.firestore(app: app)
+        } else {
+            logger.log("⚠️ No info related to Firebase has been found on the token - to use Firebase extensively, please consult to Rio team to configure Firebase credentials.")
+        }
     }
     
     private func executeAction(
@@ -952,17 +1020,37 @@ public class Rio {
         let parameters: [String: Any] = options2.body?.compactMapValues( { $0 }) ?? [:]
         let headers = options2.headers?.compactMapValues( { $0 } ) ?? [:]
         
-        if (options2.useLocal ?? false) && options2.instanceID != nil {
-            onSuccess(RioCloudObject(
-                projectID: self.projectId,
-                classID: classId,
-                instanceID: options2.instanceID!,
-                userID: "",
-                userIdentity: "",
-                rio: self,
-                isLocal: true
-            ))
-            return
+        if (options2.useLocal ?? false) &&
+            options2.instanceID != nil &&
+            options2.classID != nil {
+            
+            var userIdentity: String?
+            var userId: String?
+            if let data = self.keychain.getData(RioKeychainKey.token.keyName),
+               let json = try? JSONSerialization.jsonObject(with: data, options: []) {
+                if let storedTokenData = Mapper<RioTokenData>().map(JSONObject: json), let accessToken = storedTokenData.accessToken {
+                    let jwt = try! decode(jwt: accessToken)
+                    if let id = jwt.claim(name: "userId").string {
+                        userId = id
+                    }
+                    if let identity = jwt.claim(name: "identity").string {
+                        userIdentity = identity
+                    }
+                }
+            }
+            
+            if userIdentity != nil, userId != nil {
+                onSuccess(RioCloudObject(
+                    projectID: self.projectId,
+                    classID: classId,
+                    instanceID: options2.instanceID!,
+                    userID: userId ?? "",
+                    userIdentity: userIdentity ?? "",
+                    rio: self,
+                    isLocal: true
+                ))
+                return
+            }
         }
         
         send(
@@ -1087,15 +1175,11 @@ open class RioCloudObject {
         self.methods = methods
         self.isNewInstance = isNewInstance
         
-        if !isLocal {
-            state = State(
-                user: RioCloudObjectState(projectID: projectID, classID: classID, instanceID: instanceID, userID: userID, userIdentity: userIdentity, state: .user, db: db),
-                role: RioCloudObjectState(projectID: projectID, classID: classID, instanceID: instanceID, userID: userID, userIdentity: userIdentity, state: .role, db: db),
-                public: RioCloudObjectState(projectID: projectID, classID: classID, instanceID: instanceID, userID: userID, userIdentity: userIdentity, state: .public, db: db)
-            )
-        } else {
-            state = nil
-        }
+        state = State(
+            user: RioCloudObjectState(projectID: projectID, classID: classID, instanceID: instanceID, userID: userID, userIdentity: userIdentity, state: .user, db: db),
+            role: RioCloudObjectState(projectID: projectID, classID: classID, instanceID: instanceID, userID: userID, userIdentity: userIdentity, state: .role, db: db),
+            public: RioCloudObjectState(projectID: projectID, classID: classID, instanceID: instanceID, userID: userID, userIdentity: userIdentity, state: .public, db: db)
+        )
     }
     
     private var stamps: [TimeInterval] = []
@@ -1115,6 +1199,10 @@ open class RioCloudObject {
         
         let parameters: [String: Any] = options.body?.compactMapValues( { $0 }) ?? [:]
         let headers = options.headers?.compactMapValues( { $0 } ) ?? [:]
+        
+        if let encodingWarning = parameters.toEncodableDictionary().1 {
+            rio?.logger.log(encodingWarning)
+        }
         
         guard let rio = rio else {
             return
@@ -1312,7 +1400,7 @@ public struct RioCloudObjectOptions {
     public var keyValue: (key: String, value: String)?
     public var method: String?
     public var headers: [String: String]?
-    public var queryString: [String: String]?
+    public var queryString: [String: Any]?
     public var httpMethod: Moya.Method?
     public var body: [String: Any]?
     public var useLocal: Bool?
@@ -1325,7 +1413,7 @@ public struct RioCloudObjectOptions {
         keyValue: (key: String, value: String)? = nil,
         method: String? = nil,
         headers: [String: String]? = nil,
-        queryString: [String: String]? = nil,
+        queryString: [String: Any]? = nil,
         httpMethod: Moya.Method? = nil,
         body: [String: Any]? = nil,
         useLocal: Bool? = nil,
@@ -1359,16 +1447,36 @@ public struct RioCloudObjectMethod: Decodable {
     let tag: String?
 }
 
-struct CloudOption: Decodable {
+struct CloudOption: Decodable, Mappable {
     var customToken: String?
     var projectId: String?
     var apiKey: String?
     var envs: RioFirebaseEnv?
+    
+    init?(map: Map) {
+        
+    }
+    
+    mutating func mapping(map: Map) {
+        customToken <- map["customToken"]
+        projectId <- map["projectId"]
+        apiKey <- map["apiKey"]
+        envs <- map["envs"]
+    }
 }
 
-struct RioFirebaseEnv: Decodable {
+struct RioFirebaseEnv: Decodable, Mappable {
     var iosAppId: String?
     var gcmSenderId: String?
+    
+    init?(map: Map) {
+        
+    }
+    
+    mutating func mapping(map: Map) {
+        iosAppId <- map["iosAppId"]
+        gcmSenderId <- map["gcmSenderId"]
+    }
 }
 
 
