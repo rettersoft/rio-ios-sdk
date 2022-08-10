@@ -112,7 +112,7 @@ enum RioService {
                 if request.httpMethod == .get {
                     if let payload = request.payload, !payload.isEmpty {
                         let encodablePayload = payload.toEncodableDictionary().0
-                        if let data = try? JSONSerialization.data(withJSONObject: encodablePayload, options: .fragmentsAllowed),
+                        if let data = try? JSONSerialization.data(withJSONObject: encodablePayload, options: [.fragmentsAllowed, .sortedKeys]),
                            let base64 = data.base64EncodedString().addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
                             parameters["data"] = base64
                             parameters["__isbase64"] = true
@@ -126,18 +126,19 @@ enum RioService {
             }
             
             if let action = request.actionName {
-               
                 let accessToken = request.accessToken != nil ? request.accessToken! : ""
-                
                 if(self.isGetAction(action)) {
                     let payload: [String: Any] = request.payload == nil ? [:] : request.payload!
-                    let data: Data = try! JSONSerialization.data(withJSONObject:payload, options: [.prettyPrinted, .sortedKeys])
-                    let dataBase64 = data.base64EncodedString().addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+                    
                     var parameters =  [
                         "auth": accessToken,
-                        "platform": "IOS",
-                        "data": dataBase64!
+                        "platform": "IOS"
                     ]
+                    
+                    if let data = try? JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys]),
+                       let dataBase64 = data.base64EncodedString().addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+                        parameters["data"] = dataBase64
+                    }
                     
                     if let culture = request.culture {
                         parameters["culture"] = culture
@@ -152,11 +153,8 @@ enum RioService {
                     
                     return parameters
                 }
-                
             } else {
-                
                 return [:]
-                
             }
         }
     }

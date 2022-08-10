@@ -518,7 +518,7 @@ public class Rio {
             if let userId = jwt.claim(name: "userId").string, let anonymous = jwt.claim(name: "anonymous").rawValue as? Bool {
                 
                 if userId != storedUserId {
-                    logger.log("userId \(userId) - stored: \(storedUserId)")
+                    logger.log("userId \(userId) - stored: \(storedUserId ?? "-")")
                     // User has changed.
                     let user = RioUser(uid: userId, isAnonymous: anonymous)
                     
@@ -533,7 +533,7 @@ public class Rio {
                         self.logger.log("FIREBASE custom auth \(userId)")
                        
                         Auth.auth(app: app).signIn(withCustomToken: customToken) { [weak self] (resp, error)  in
-                            self?.logger.log("FIREBASE custom auth COMPLETE user: \(resp?.user)")
+                            self?.logger.log("FIREBASE custom auth COMPLETE user: \(resp?.user as Any)")
                             self?.firebaseAuthSemaphore.signal()
                         }
                         
@@ -547,7 +547,31 @@ public class Rio {
                             self.delegate?.rioClient(client: self, authStatusChanged: .signedIn(user: user))
                         }
                     }
-                    
+                } else {
+                    if Auth.auth().currentUser?.uid == nil {
+                        let user = RioUser(uid: userId, isAnonymous: anonymous)
+                        logger.log("initFirebaseApp 2")
+                        if let app = self.firebaseApp, let customToken = tokenData.firebase?.customToken {
+                            self.logger.log("FIREBASE custom auth \(userId)")
+                           
+                            Auth.auth(app: app).signIn(withCustomToken: customToken) { [weak self] (resp, error)  in
+                                self?.logger.log("FIREBASE custom auth COMPLETE user: \(resp?.user as Any)")
+                                self?.firebaseAuthSemaphore.signal()
+                            }
+                            
+                            _ = self.firebaseAuthSemaphore.wait(wallTimeout: .distantFuture)
+                        }
+                        
+                        DispatchQueue.main.async {
+                            if anonymous {
+                                self.delegate?.rioClient(client: self, authStatusChanged: .signedInAnonymously(user: user))
+                            } else {
+                                self.delegate?.rioClient(client: self, authStatusChanged: .signedIn(user: user))
+                            }
+                        }
+                    } else {
+                        logger.log("already authorized Firebase user with uid: \(Auth.auth().currentUser?.uid ?? "")")
+                    }
                 }
             }
         }
@@ -1182,15 +1206,11 @@ open class RioCloudObject {
         )
     }
     
-    private var stamps: [TimeInterval] = []
-    
     public func call(
         with options: RioCloudObjectOptions,
         onSuccess: @escaping (RioCloudObjectResponse) -> Void,
         onError: @escaping (RioCloudObjectError) -> Void
     ) {
-        
-        stamps.append(Date().timeIntervalSince1970)
         
         var options2 = options
         options2.classID = self.classID
@@ -1227,8 +1247,6 @@ open class RioCloudObject {
                     let remaining = config.count - 1
                     rio.logger.log("Remaining count for retry -> \(remaining)")
                     if remaining < 1 {
-                        if let stamps = self?.stamps {
-                        }
                         let specialResponse = RioCloudObjectResponse(statusCode: 570, headers: nil, body: nil)
                         onError(RioCloudObjectError(error: .methodReturnedError, response: specialResponse))
                         return
