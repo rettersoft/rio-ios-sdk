@@ -130,8 +130,8 @@ enum RioService {
                 let accessToken = request.accessToken != nil ? request.accessToken! : ""
                 
                 if(self.isGetAction(action)) {
-                    let payload: [String:Any] = request.payload == nil ? [:] : request.payload!
-                    let data: Data = try! JSONSerialization.data(withJSONObject:payload, options: JSONSerialization.WritingOptions.prettyPrinted)
+                    let payload: [String: Any] = request.payload == nil ? [:] : request.payload!
+                    let data: Data = try! JSONSerialization.data(withJSONObject:payload, options: [.prettyPrinted, .sortedKeys])
                     let dataBase64 = data.base64EncodedString().addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
                     var parameters =  [
                         "auth": accessToken,
