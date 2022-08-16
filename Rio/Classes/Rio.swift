@@ -58,7 +58,7 @@ public enum RioRegion {
             return prodOptions
         }
     }
-        
+    
     private var betaOptions: FirebaseOptions {
         let firebaseOptions = FirebaseOptions(googleAppID: "1:814752823492:ios:6429462157e997a146f191",
                                               gcmSenderID: "814752823492")
@@ -531,7 +531,7 @@ public class Rio {
                     logger.log("initFirebaseApp 1")
                     if let app = self.firebaseApp, let customToken = tokenData.firebase?.customToken {
                         self.logger.log("FIREBASE custom auth \(userId)")
-                       
+                        
                         Auth.auth(app: app).signIn(withCustomToken: customToken) { [weak self] (resp, error)  in
                             self?.logger.log("FIREBASE custom auth COMPLETE user: \(resp?.user as Any)")
                             self?.firebaseAuthSemaphore.signal()
@@ -548,29 +548,29 @@ public class Rio {
                         }
                     }
                 } else {
-                    if Auth.auth().currentUser?.uid == nil {
-                        let user = RioUser(uid: userId, isAnonymous: anonymous)
-                        logger.log("initFirebaseApp 2")
-                        if let app = self.firebaseApp, let customToken = tokenData.firebase?.customToken {
+                    configureFirebase(with: tokenData)
+                    if let app = self.firebaseApp, let customToken = tokenData.firebase?.customToken {
+                        if Auth.auth(app: app).currentUser?.uid == nil {
+                            let user = RioUser(uid: userId, isAnonymous: anonymous)
+                            logger.log("initFirebaseApp 2")
                             self.logger.log("FIREBASE custom auth \(userId)")
-                           
+                            
                             Auth.auth(app: app).signIn(withCustomToken: customToken) { [weak self] (resp, error)  in
                                 self?.logger.log("FIREBASE custom auth COMPLETE user: \(resp?.user as Any)")
                                 self?.firebaseAuthSemaphore.signal()
                             }
-                            
                             _ = self.firebaseAuthSemaphore.wait(wallTimeout: .distantFuture)
-                        }
-                        
-                        DispatchQueue.main.async {
-                            if anonymous {
-                                self.delegate?.rioClient(client: self, authStatusChanged: .signedInAnonymously(user: user))
-                            } else {
-                                self.delegate?.rioClient(client: self, authStatusChanged: .signedIn(user: user))
+                            
+                            DispatchQueue.main.async {
+                                if anonymous {
+                                    self.delegate?.rioClient(client: self, authStatusChanged: .signedInAnonymously(user: user))
+                                } else {
+                                    self.delegate?.rioClient(client: self, authStatusChanged: .signedIn(user: user))
+                                }
                             }
+                        } else {
+                            logger.log("already authorized Firebase user with uid: \(Auth.auth(app: app).currentUser?.uid ?? "")")
                         }
-                    } else {
-                        logger.log("already authorized Firebase user with uid: \(Auth.auth().currentUser?.uid ?? "")")
                     }
                 }
             }
@@ -612,7 +612,7 @@ public class Rio {
         
         retVal?.projectId = self.config.projectId
         retVal?.isAnonym = true
-
+        
         if let e = errorResponse {
             throw e
         }
@@ -657,7 +657,7 @@ public class Rio {
         
         retVal?.projectId = tokenData.projectId
         retVal?.isAnonym = tokenData.isAnonym
-
+        
         if let e = errorResponse {
             throw e
         }
@@ -671,7 +671,7 @@ public class Rio {
         guard let accessToken = token,
               let jwt = try? decode(jwt: accessToken),
               let serverTime = jwt.claim(name: "iat").integer else {
-                return
+            return
         }
         
         deltaTime =  TimeInterval(serverTime) - Date().timeIntervalSince1970
@@ -691,7 +691,7 @@ public class Rio {
            let gcmSenderID = tokenData.firebase?.envs?.gcmSenderId,
            let firebaseProjectID = tokenData.firebase?.projectId,
            let apiKey = tokenData.firebase?.apiKey {
-
+            
             if FirebaseApp.app(name: "rio") == nil {
                 let options = getFirebaseOptions(
                     with: RioFirebaseOptions(
@@ -701,7 +701,7 @@ public class Rio {
                         apiKey: apiKey
                     )
                 )
-
+                
                 FirebaseApp.configure(name: "rio", options: options)
             }
             
@@ -1090,9 +1090,9 @@ public class Rio {
             guard let firstResponse = response.first as? RioCloudObjectResponse,
                   let data = firstResponse.body,
                   let cloudResponse = try? JSONDecoder().decode(RioCloudObjectInstanceResponse.self, from: data) else {
-                      return
-                  }
-
+                return
+            }
+            
             var objectData: Data?
             if let insDict = (try? JSONSerialization.jsonObject(with: data, options: .mutableContainers)) as? [String: Any],
                insDict["response"] != nil,
@@ -1137,7 +1137,6 @@ public class Rio {
             }
         } onError: { (error) in
             if let error = error as? BaseErrorResponse, let cloudObjectResponse = error.cloudObjectResponse {
-
                 if let errorData = cloudObjectResponse.body,
                    let validatationError = try? JSONDecoder().decode(ValidationError.self, from: errorData),
                    let issues = validatationError.issues {
