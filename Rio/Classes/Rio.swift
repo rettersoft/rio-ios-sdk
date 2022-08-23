@@ -515,7 +515,7 @@ public class Rio {
         
         if let accessToken = tokenData.accessToken {
             let jwt = try! decode(jwt: accessToken)
-            if let userId = jwt.claim(name: "userId").string, let anonymous = jwt.claim(name: "anonymous").rawValue as? Bool {
+            if let userId = jwt.claim(name: "userId").string, let anonymous = jwt.claim(name: "anonymous").rawValue as? Bool, let identity = jwt.claim(name: "identity").string {
                 
                 if userId != storedUserId {
                     logger.log("userId \(userId) - stored: \(storedUserId ?? "-")")
@@ -535,6 +535,9 @@ public class Rio {
                         Auth.auth(app: app).signIn(withCustomToken: customToken) { [weak self] (resp, error)  in
                             self?.logger.log("FIREBASE custom auth COMPLETE user: \(resp?.user as Any)")
                             self?.firebaseAuthSemaphore.signal()
+                            self?.cloudObjects.forEach({ object in
+                                object.updateUser(id: userId, userIdentity: identity)
+                            })
                         }
                         
                         _ = self.firebaseAuthSemaphore.wait(wallTimeout: .distantFuture)
@@ -1169,8 +1172,8 @@ open class RioCloudObject {
     private let projectID: String
     fileprivate let classID: String
     fileprivate let instanceID: String
-    private let userID: String
-    private let userIdentity: String
+    private var userID: String
+    private var userIdentity: String
     private weak var db: Firestore?
     private weak var rio: Rio?
     public let state: State?
@@ -1203,6 +1206,11 @@ open class RioCloudObject {
             role: RioCloudObjectState(projectID: projectID, classID: classID, instanceID: instanceID, userID: userID, userIdentity: userIdentity, state: .role, db: db),
             public: RioCloudObjectState(projectID: projectID, classID: classID, instanceID: instanceID, userID: userID, userIdentity: userIdentity, state: .public, db: db)
         )
+    }
+    
+    public func updateUser(id: String, userIdentity: String) {
+        self.userID = id
+        self.userIdentity = userIdentity
     }
     
     public func call(
