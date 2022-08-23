@@ -534,10 +534,10 @@ public class Rio {
                         
                         Auth.auth(app: app).signIn(withCustomToken: customToken) { [weak self] (resp, error)  in
                             self?.logger.log("FIREBASE custom auth COMPLETE user: \(resp?.user as Any)")
-                            self?.firebaseAuthSemaphore.signal()
                             self?.cloudObjects.forEach({ object in
                                 object.updateUser(id: userId, userIdentity: identity)
                             })
+                            self?.firebaseAuthSemaphore.signal()
                         }
                         
                         _ = self.firebaseAuthSemaphore.wait(wallTimeout: .distantFuture)
