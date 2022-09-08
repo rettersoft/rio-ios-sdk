@@ -240,6 +240,17 @@ enum RioKeychainKey {
     }
 }
 
+enum RioUserDefaultsKey {
+    case openedFirstTime
+    
+    var keyName: String {
+        switch self {
+        case .openedFirstTime:
+            return "io.retter.openedFirstTime"
+        }
+    }
+}
+
 struct ValidationError: Decodable {
     let issues: [ValidationIssue]?
 }
@@ -382,6 +393,11 @@ public class Rio {
         self.config = config
         self.projectId = config.projectId
         globalRioRegion = config.region!
+        
+        if !UserDefaults.standard.bool(forKey: RioUserDefaultsKey.openedFirstTime.keyName) {
+            keychain.delete(RioKeychainKey.token.keyName)
+            UserDefaults.standard.set(true, forKey: RioUserDefaultsKey.openedFirstTime.keyName)
+        }
     }
     
     public var culture : String {
