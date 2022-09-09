@@ -1064,8 +1064,8 @@ public class Rio {
             options2.instanceID != nil &&
             options2.classID != nil {
             
-            var userIdentity: String?
-            var userId: String?
+            var userIdentity = ""
+            var userId = ""
             if let data = self.keychain.getData(RioKeychainKey.token.keyName),
                let json = try? JSONSerialization.jsonObject(with: data, options: []) {
                 if let storedTokenData = Mapper<RioTokenData>().map(JSONObject: json), let accessToken = storedTokenData.accessToken {
@@ -1079,18 +1079,16 @@ public class Rio {
                 }
             }
             
-            if userIdentity != nil, userId != nil {
-                onSuccess(RioCloudObject(
-                    projectID: self.projectId,
-                    classID: classId,
-                    instanceID: options2.instanceID!,
-                    userID: userId ?? "",
-                    userIdentity: userIdentity ?? "",
-                    rio: self,
-                    isLocal: true
-                ))
-                return
-            }
+            onSuccess(RioCloudObject(
+                projectID: self.projectId,
+                classID: classId,
+                instanceID: options2.instanceID!,
+                userID: userId ?? "",
+                userIdentity: userIdentity ?? "",
+                rio: self,
+                isLocal: true
+            ))
+            return
         }
         
         send(
@@ -1379,9 +1377,24 @@ public class RioCloudObjectState {
             return
         }
         
+        var userId = userID
+        var identity = userIdentity
+        if userId.isEmpty, identity.isEmpty, let data = KeychainSwift().getData(RioKeychainKey.token.keyName),
+           let json = try? JSONSerialization.jsonObject(with: data, options: []) {
+            if let storedTokenData = Mapper<RioTokenData>().map(JSONObject: json), let accessToken = storedTokenData.accessToken {
+                let jwt = try! decode(jwt: accessToken)
+                if let id = jwt.claim(name: "userId").string {
+                    userId = id
+                }
+                if let theIdentity = jwt.claim(name: "identity").string {
+                    identity = theIdentity
+                }
+            }
+        }
+        
         switch state {
         case .user:
-            path.append("userState/\(userID)")
+            path.append("userState/\(userId)")
             listener = database.document(path)
                 .addSnapshotListener { (snap, error) in
                     guard error == nil else {
@@ -1392,7 +1405,7 @@ public class RioCloudObjectState {
                     onSuccess(snap?.data())
                 }
         case .role:
-            path.append("roleState/\(userIdentity)")
+            path.append("roleState/\(identity)")
             listener = database.document(path)
                 .addSnapshotListener { (snap, error) in
                     guard error == nil else {
