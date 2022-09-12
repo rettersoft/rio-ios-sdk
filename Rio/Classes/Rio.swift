@@ -383,6 +383,8 @@ public class Rio {
     
     public init(config: RioConfig) {
         self.logger = RioLogger(isLoggingEnabled: config.isLoggingEnabled ?? false)
+        self.config = config
+        
         if let sslPinningEnabled = config.sslPinningEnabled, sslPinningEnabled == false {
             // Dont enable ssl pinning
             logger.log("WARNING! Rio SSL Pinning disabled.")
@@ -390,7 +392,7 @@ public class Rio {
             self.setupTrustKit()
         }
         
-        self.config = config
+        
         self.projectId = config.projectId
         globalRioRegion = config.region!
         
@@ -430,18 +432,28 @@ public class Rio {
                 "FfFKxFycfaIz00eRZOgTf+Ne4POK6FgYPwhBDqgqxLQ="
             ]
         ]
+        
+        var domains = [
+            "core.rtbs.io": pinningConfig,
+            "core-test.rettermobile.com": pinningConfig,
+            "core-test.rtbs.io": pinningConfig,
+            "core-internal.rtbs.io": pinningConfig,
+            "core-internal-beta.rtbs.io": pinningConfig,
+            "api.retter.io": pinningConfig,
+            "test-api.retter.io": pinningConfig
+        ]
+        
+        if let region = self.config.region {
+            domains[region.apiURL] = pinningConfig
+        }
+        
+        
         let trustKitConfig = [
-            kTSKSwizzleNetworkDelegates: false,
-            kTSKPinnedDomains: [
-                "core.rtbs.io": pinningConfig,
-                "core-test.rettermobile.com": pinningConfig,
-                "core-test.rtbs.io": pinningConfig,
-                "core-internal.rtbs.io": pinningConfig,
-                "core-internal-beta.rtbs.io": pinningConfig,
-                "api.retter.io": pinningConfig,
-                "test-api.retter.io": pinningConfig
-            ]
+            kTSKSwizzleNetworkDelegates: true,
+            kTSKPinnedDomains: domains
         ] as [String: Any]
+        
+        
         
         TrustKit.setLoggerBlock { (_) in }
         TrustKit.initSharedInstance(withConfiguration: trustKitConfig)
