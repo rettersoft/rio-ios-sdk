@@ -9,6 +9,7 @@ import TrustKit
 import FirebaseCore
 import FirebaseFirestore
 import FirebaseAuth
+import GTMSessionFetcher
 
 let defaultCulture = "en-us"
 
@@ -364,6 +365,37 @@ public class Rio {
             if config.isLoggingEnabled ?? false {
                 plugins.append(NetworkLoggerPlugin())
             }
+
+            /*
+            var session = Session()
+            if config.sslPinningEnabled ?? false {
+                // The file with any of extensions .cer, .pem etc should be added.
+                let evaluator = PinnedCertificatesTrustEvaluator()
+                
+                var domains: [String: ServerTrustEvaluating] = [
+                    "core.rtbs.io": evaluator,
+                    "core-test.rettermobile.com": evaluator,
+                    "core-test.rtbs.io": evaluator,
+                    "core-internal.rtbs.io": evaluator,
+                    "core-internal-beta.rtbs.io": evaluator,
+                    "api.retter.io": evaluator,
+                    "test-api.retter.io": evaluator
+                ]
+                
+                if let region = self.config.region {
+                    domains[region.apiURL] = evaluator
+                }
+                
+                let serverTrustManager = ServerTrustManager(evaluators: domains)
+                session = Session(serverTrustManager: serverTrustManager)
+            } else {
+                logger.log("WARNING! Rio SSL Pinning disabled.")
+            }
+             
+             self._service = MoyaProvider<RioService>(session: session, plugins: plugins)
+            */
+            
+            
             self._service = MoyaProvider<RioService>(plugins: plugins)
             
             return self._service!
@@ -419,6 +451,7 @@ public class Rio {
     // MARK: - Private methods
     
     private func setupTrustKit() {
+        GTMSessionFetcherService.swizzleDelegateDispatcherForFetcher()
         let pinningConfig: [String : Any] = [
             kTSKEnforcePinning: true,
             kTSKIncludeSubdomains: true,
