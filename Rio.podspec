@@ -32,9 +32,11 @@ TODO: Add long description of the pod here.
 
   s.source_files = 'Rio/Classes/**/*'
   
-  # s.resource_bundles = {
-  #   'Rio' => ['Rio/Assets/*.png']
-  # }
+  s.resource_bundles = {
+    'Rio' => [
+        'Pod/**/*.cer'
+    ]
+  }
 
   # s.public_header_files = 'Pod/Classes/**/*.h'
   # s.frameworks = 'UIKit', 'MapKit'

@@ -5,11 +5,9 @@ import KeychainSwift
 import ObjectMapper
 import JWTDecode
 import Foundation
-import TrustKit
 import FirebaseCore
 import FirebaseFirestore
 import FirebaseAuth
-import GTMSessionFetcher
 
 let defaultCulture = "en-us"
 
@@ -365,39 +363,52 @@ public class Rio {
             if config.isLoggingEnabled ?? false {
                 plugins.append(NetworkLoggerPlugin())
             }
-
-            /*
-            var session = Session()
+            
             if config.sslPinningEnabled ?? false {
-                // The file with any of extensions .cer, .pem etc should be added.
-                let evaluator = PinnedCertificatesTrustEvaluator()
-                
-                var domains: [String: ServerTrustEvaluating] = [
-                    "core.rtbs.io": evaluator,
-                    "core-test.rettermobile.com": evaluator,
-                    "core-test.rtbs.io": evaluator,
-                    "core-internal.rtbs.io": evaluator,
-                    "core-internal-beta.rtbs.io": evaluator,
-                    "api.retter.io": evaluator,
-                    "test-api.retter.io": evaluator
-                ]
-                
-                if let region = self.config.region {
-                    domains[region.apiURL] = evaluator
+                if let bundleURL = Bundle(for: type(of: self)).url(forResource: "Rio", withExtension: "bundle") {
+                    if let bundle = Bundle(url: bundleURL) {
+                        let certificates: [SecCertificate] = [1, 2, 3, 4, 5].map { element in
+                            let path = bundle.path(forResource: "\(element)", ofType: "cer") ?? ""
+                            let certificateData = try? Data(contentsOf: URL(fileURLWithPath: path)) as CFData
+                            return SecCertificateCreateWithData(nil, certificateData!)!
+                        }
+                        
+                        let evaluator = PinnedCertificatesTrustEvaluator(certificates: certificates)
+                        var session = Session()
+                        
+                        
+                        var domains: [String: ServerTrustEvaluating] = [
+                            "core.rtbs.io": evaluator,
+                            "core-test.rettermobile.com": evaluator,
+                            "core-test.rtbs.io": evaluator,
+                            "core-internal.rtbs.io": evaluator,
+                            "core-internal-beta.rtbs.io": evaluator,
+                            "api.retter.io": evaluator,
+                            "test-api.retter.io": evaluator,
+                            "root.api.retter.io": evaluator,
+                            "\(projectId!).api.retter.io": evaluator
+                        ]
+                        
+                        if let region = self.config.region {
+                            domains[region.apiURL] = evaluator
+                        }
+                        
+                        let serverTrustManager = ServerTrustManager(evaluators: domains)
+                        session = Session(serverTrustManager: serverTrustManager)
+                        
+                        self._service = MoyaProvider<RioService>(session: session, plugins: plugins)
+                        return self._service!
+                    } else {
+                        logger.log("WARNING! An error occurred while pinning SSL.")
+                    }
+                } else {
+                    logger.log("WARNING! An error occurred while pinning SSL.")
                 }
-                
-                let serverTrustManager = ServerTrustManager(evaluators: domains)
-                session = Session(serverTrustManager: serverTrustManager)
             } else {
                 logger.log("WARNING! Rio SSL Pinning disabled.")
             }
-             
-             self._service = MoyaProvider<RioService>(session: session, plugins: plugins)
-            */
-            
             
             self._service = MoyaProvider<RioService>(plugins: plugins)
-            
             return self._service!
         }
     }
@@ -416,14 +427,6 @@ public class Rio {
     public init(config: RioConfig) {
         self.logger = RioLogger(isLoggingEnabled: config.isLoggingEnabled ?? false)
         self.config = config
-        
-        if let sslPinningEnabled = config.sslPinningEnabled, sslPinningEnabled == false {
-            // Dont enable ssl pinning
-            logger.log("WARNING! Rio SSL Pinning disabled.")
-        } else {
-            self.setupTrustKit()
-        }
-        
         
         self.projectId = config.projectId
         globalRioRegion = config.region!
@@ -449,49 +452,6 @@ public class Rio {
     }
     
     // MARK: - Private methods
-    
-    private func setupTrustKit() {
-        GTMSessionFetcherService.swizzleDelegateDispatcherForFetcher()
-        let pinningConfig: [String : Any] = [
-            kTSKEnforcePinning: true,
-            kTSKIncludeSubdomains: true,
-            kTSKExpirationDate: "2025-12-01",
-            kTSKPublicKeyHashes: [
-                "++MBgDH5WGvL9Bcn5Be30cRcL0f5O+NyoXuWtQdX1aI=",
-                "f0KW/FtqTjs108NpYj42SrGvOB2PpxIVM8nWxjPqJGE=",
-                "NqvDJlas/GRcYbcWE8S/IceH9cq77kg0jVhZeAPXq8k=",
-                "9+ze1cZgR9KO1kZrVDxA4HQ6voHRCSVNz4RdTCx4U8U=",
-                "KwccWaCgrnaw6tsrrSO61FgLacNgG2MMLq8GE6+oP5I=",
-                "FfFKxFycfaIz00eRZOgTf+Ne4POK6FgYPwhBDqgqxLQ="
-            ]
-        ]
-        
-        var domains = [
-            "core.rtbs.io": pinningConfig,
-            "core-test.rettermobile.com": pinningConfig,
-            "core-test.rtbs.io": pinningConfig,
-            "core-internal.rtbs.io": pinningConfig,
-            "core-internal-beta.rtbs.io": pinningConfig,
-            "api.retter.io": pinningConfig,
-            "test-api.retter.io": pinningConfig
-        ]
-        
-        if let region = self.config.region {
-            domains[region.apiURL] = pinningConfig
-        }
-        
-        
-        let trustKitConfig = [
-            kTSKSwizzleNetworkDelegates: true,
-            kTSKPinnedDomains: domains
-        ] as [String: Any]
-        
-        
-        
-        TrustKit.setLoggerBlock { (_) in }
-        TrustKit.initSharedInstance(withConfiguration: trustKitConfig)
-    }
-    
     private func getTokenData() throws -> RioTokenData {
         logger.log("getTokenData called")
         
