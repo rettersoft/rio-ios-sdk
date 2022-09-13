@@ -8,7 +8,7 @@
 
 Pod::Spec.new do |s|
   s.name             = 'Rio'
-  s.version          = '0.0.36'
+  s.version          = '0.0.37'
   s.summary          = 'A short description of Rio.'
 
 # This description is used to generate tags and improve search results.
@@ -32,11 +32,11 @@ TODO: Add long description of the pod here.
 
   s.source_files = 'Rio/Classes/**/*'
   
-  #s.resource_bundles = {
-  #  'Rio' => [
-  #      'Rio/**/*'
-  #  ]
-  #}
+  s.resource_bundles = {
+    'RioBundle' => [
+        '**/Assets/*'
+    ]
+  }
 
   # s.public_header_files = 'Pod/Classes/**/*.h'
   # s.frameworks = 'UIKit', 'MapKit'

@@ -292,11 +292,11 @@
 			);
 			inputPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Rio_Example/Pods-Rio_Example-resources.sh",
-				"${PODS_CONFIGURATION_BUILD_DIR}/Rio/Rio.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/Rio/RioBundle.bundle",
 			);
 			name = "[CP] Copy Pods Resources";
 			outputPaths = (
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Rio.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RioBundle.bundle",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;

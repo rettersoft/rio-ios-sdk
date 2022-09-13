@@ -365,7 +365,7 @@ public class Rio {
             }
             
             if config.sslPinningEnabled ?? false {
-                if let bundleURL = Bundle(for: type(of: self)).url(forResource: "Rio", withExtension: "bundle") {
+                if let bundleURL = Bundle(for: type(of: self)).url(forResource: "RioBundle", withExtension: "bundle") {
                     if let bundle = Bundle(url: bundleURL) {
                         let certificates: [SecCertificate] = [1, 2, 3, 4, 5].map { element in
                             let path = bundle.path(forResource: "\(element)", ofType: "cer") ?? ""
