@@ -1088,8 +1088,8 @@ public class Rio {
                 projectID: self.projectId,
                 classID: classId,
                 instanceID: options2.instanceID!,
-                userID: userId ?? "",
-                userIdentity: userIdentity ?? "",
+                userID: userId,
+                userIdentity: userIdentity,
                 rio: self,
                 isLocal: true
             ))

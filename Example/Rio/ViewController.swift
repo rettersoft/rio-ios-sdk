@@ -61,7 +61,7 @@ class ViewController: UIViewController {
     @IBAction func btnSayHelloTapped(_ sender: Any) {
         self.rioObj?.call(with: RioCloudObjectOptions(method: "sayHello", culture: "tr-TR")) { resp in
             
-            print("resp \(resp.body)")
+            print("resp \(String(describing: resp.body))")
             
         } onError: { error in
             
