@@ -43,7 +43,7 @@
 		68192BCDCC6289B205DA2366 /* Pods-Rio_Tests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Rio_Tests.release.xcconfig"; path = "Target Support Files/Pods-Rio_Tests/Pods-Rio_Tests.release.xcconfig"; sourceTree = "<group>"; };
 		8DD84A09205F828DB18D2E8D /* Pods-Rio_Tests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Rio_Tests.debug.xcconfig"; path = "Target Support Files/Pods-Rio_Tests/Pods-Rio_Tests.debug.xcconfig"; sourceTree = "<group>"; };
 		D76BC167D0F9737B4F565F76 /* Pods_Rio_Tests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Rio_Tests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		D7B8581BAC2B550F7B8E5B77 /* Rio.podspec */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; name = Rio.podspec; path = ../Rio.podspec; sourceTree = "<group>"; };
+		D7B8581BAC2B550F7B8E5B77 /* Rio.podspec */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; name = Rio.podspec; path = ../Rio.podspec; sourceTree = "<group>"; xcLanguageSpecificationIdentifier = xcode.lang.ruby; };
 		E960D9774EE4086EB38BD281 /* README.md */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = net.daringfireball.markdown; name = README.md; path = ../README.md; sourceTree = "<group>"; };
 		FC4EEB819E5A413AA341092D /* Pods_Rio_Example.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Rio_Example.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		FF5BF6781D0C10BCBBEB806E /* Pods-Rio_Example.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Rio_Example.release.xcconfig"; path = "Target Support Files/Pods-Rio_Example/Pods-Rio_Example.release.xcconfig"; sourceTree = "<group>"; };
@@ -171,6 +171,7 @@
 				607FACCD1AFB9204008FA782 /* Frameworks */,
 				607FACCE1AFB9204008FA782 /* Resources */,
 				659470C4D08F8C59022D5FFE /* [CP] Embed Pods Frameworks */,
+				3F894B54E102E1DB058C09FB /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
@@ -282,6 +283,24 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		3F894B54E102E1DB058C09FB /* [CP] Copy Pods Resources */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Rio_Example/Pods-Rio_Example-resources.sh",
+				"${PODS_CONFIGURATION_BUILD_DIR}/Rio/Rio.bundle",
+			);
+			name = "[CP] Copy Pods Resources";
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Rio.bundle",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Rio_Example/Pods-Rio_Example-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		659470C4D08F8C59022D5FFE /* [CP] Embed Pods Frameworks */ = {
