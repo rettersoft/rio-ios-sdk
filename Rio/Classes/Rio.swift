@@ -305,9 +305,7 @@ public class Rio {
     
     let semaphore = DispatchSemaphore(value: 0)
     let firebaseAuthSemaphore = DispatchSemaphore(value: 0)
-    
-    private var cloudObjects: [RioCloudObject] = []
-    
+        
     public var delegate: RioClientDelegate? {
         didSet {
             // Check token data and raise status update
@@ -543,12 +541,6 @@ public class Rio {
                     // User has changed.
                     let user = RioUser(uid: userId, isAnonymous: anonymous)
                     
-                    cloudObjects.forEach { object in
-                        object.state?.removeListeners()
-                    }
-                    
-                    cloudObjects.removeAll()
-                    
                     logger.log("initFirebaseApp 1")
                     if let app = self.firebaseApp, let customToken = tokenData.firebase?.customToken {
                         self.logger.log("FIREBASE custom auth \(userId)")
@@ -665,12 +657,14 @@ public class Rio {
                     errorResponse = BaseErrorResponse()
                     errorResponse?.cloudObjectResponse = RioCloudObjectResponse(statusCode: response.statusCode, headers: nil, body: nil)
                     errorResponse?.httpStatusCode = response.statusCode
+                    self?.signOut()
                 }
             case .failure(let f):
                 errorResponse = BaseErrorResponse()
                 errorResponse?.cloudObjectResponse = RioCloudObjectResponse(statusCode: -1, headers: nil, body: nil)
                 errorResponse?.httpStatusCode = -1
                 errorResponse?.moyaError = f
+                self?.signOut()
             }
             self?.semaphore.signal()
         }
@@ -912,23 +906,11 @@ public class Rio {
         
         self.saveTokenData(tokenData: nil)
         do {
-            cloudObjects.forEach { object in
-                object.state?.removeListeners()
-            }
-            cloudObjects.removeAll()
-            
             guard let app = firebaseApp else {
                 return
             }
             try Auth.auth(app: app).signOut()
         } catch { }
-    }
-    
-    public func removeAllCloudObjects() { // ONLY FOR TEST PURPOSES
-        cloudObjects.forEach { object in
-            object.state?.removeListeners()
-        }
-        cloudObjects.removeAll()
     }
     
     private func generatePublicGetActionUrl(
@@ -1056,12 +1038,6 @@ public class Rio {
             return
         }
         
-        if let instance = options2.instanceID,
-           let object = cloudObjects.filter({ $0.classID == classId && $0.instanceID == instance }).first {
-            onSuccess(object)
-            return
-        }
-        
         let parameters: [String: Any] = options2.body?.compactMapValues( { $0 }) ?? [:]
         let headers = options2.headers?.compactMapValues( { $0 } ) ?? [:]
         
@@ -1135,24 +1111,18 @@ public class Rio {
                         }
                     }
                 }
-                
-                if let object = self.cloudObjects.filter({ $0.classID == classId && $0.instanceID == respInstanceId }).first {
-                    onSuccess(object)
-                } else {
-                    let object = RioCloudObject(
-                        projectID: self.projectId,
-                        classID: classId,
-                        instanceID: respInstanceId,
-                        userID: userId ?? "",
-                        userIdentity: userIdentity ?? "",
-                        rio: self,
-                        response: objectData,
-                        methods: cloudResponse.methods,
-                        isNewInstance: cloudResponse.isNewInstance ?? false
-                    )
-                    self.cloudObjects.append(object)
-                    onSuccess(object)
-                }
+                let object = RioCloudObject(
+                    projectID: self.projectId,
+                    classID: classId,
+                    instanceID: respInstanceId,
+                    userID: userId ?? "",
+                    userIdentity: userIdentity ?? "",
+                    rio: self,
+                    response: objectData,
+                    methods: cloudResponse.methods,
+                    isNewInstance: cloudResponse.isNewInstance ?? false
+                )
+                onSuccess(object)
             }
         } onError: { (error) in
             if let error = error as? BaseErrorResponse, let cloudObjectResponse = error.cloudObjectResponse {
