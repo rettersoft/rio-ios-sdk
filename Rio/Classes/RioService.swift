@@ -53,11 +53,11 @@ enum RioService {
                 
             }
         case .refreshToken(let request):
-            return "/root/CALL/ProjectUser/refreshToken/\(request.projectId ?? "")_\(request.userId ?? "")"
+            return "/\(request.projectId ?? "")/AUTH/refreshToken"
         case .authWithCustomToken(let request):
-            return "/root/CALL/ProjectUser/authWithCustomToken/\(request.projectId ?? "")_\(request.userId ?? "")"
+            return "/\(request.projectId ?? "")/AUTH/authWithCustomToken"
         case .signout(let request):
-            return "/root/CALL/ProjectUser/signOut/\(request.projectId ?? "")_\(request.userId ?? "")"
+            return "/\(request.projectId ?? "")/AUTH/signOut"
         }
     }
     
@@ -87,15 +87,15 @@ enum RioService {
         case .authWithCustomToken(let request):
             return ["customToken": request.customToken ?? ""]
         case .signout(let request):
-            return ["accessToken": request.accessToken ?? ""]
+            return ["_token": request.accessToken ?? ""]
             
         case .executeAction(let request):
             
             if cloudObjectActions.contains(request.actionName ?? "") {
-
-                var parameters: [String: Any] =  [
-                    "_token": request.accessToken != nil ? request.accessToken! : "",
-                ]
+                var parameters: [String: Any] = [:]
+                if let token = request.accessToken {
+                    parameters["_token"] = token
+                }
                 
                 if let queryParameters = request.queryString {
                     for (key, value) in queryParameters {

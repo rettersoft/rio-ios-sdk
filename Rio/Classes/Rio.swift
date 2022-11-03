@@ -309,8 +309,8 @@ public class Rio {
     public var delegate: RioClientDelegate? {
         didSet {
             // Check token data and raise status update
-            if let data = self.keychain.getData(RioKeychainKey.token.keyName) {
-                let json = try! JSONSerialization.jsonObject(with: data, options: [])
+            if let data = self.keychain.getData(RioKeychainKey.token.keyName),
+               let json = try? JSONSerialization.jsonObject(with: data, options: []) {
                 
                 if let tokenData = Mapper<RioTokenData>().map(JSONObject: json),
                    let accessToken = tokenData.accessToken {
@@ -318,26 +318,15 @@ public class Rio {
                     configureFirebase(with: tokenData)
                     
                     let jwt = try! decode(jwt: accessToken)
-                    if let userId = jwt.claim(name: "userId").string, let anonymous = jwt.claim(name: "anonymous").rawValue as? Bool {
-                        
+                    if let userId = jwt.claim(name: "userId").string {
                         // User has changed.
-                        let user = RioUser(uid: userId, isAnonymous: anonymous)
-                        
-                        if anonymous {
-                            self.delegate?.rioClient(client: self, authStatusChanged: .signedInAnonymously(user: user))
-                        } else {
-                            self.delegate?.rioClient(client: self, authStatusChanged: .signedIn(user: user))
-                        }
+                        let user = RioUser(uid: userId, isAnonymous: false)
+                        self.delegate?.rioClient(client: self, authStatusChanged: .signedIn(user: user))
                     } else {
                         self.delegate?.rioClient(client: self, authStatusChanged: .signedOut)
                     }
-                } else {
-                    self.delegate?.rioClient(client: self, authStatusChanged: .signedOut)
                 }
-            } else {
-                self.delegate?.rioClient(client: self, authStatusChanged: .signedOut)
             }
-            
         }
     }
     
@@ -349,8 +338,8 @@ public class Rio {
             }
             
             let accessTokenPlugin = AccessTokenPlugin { _ -> String in
-                if let data = self.keychain.getData(RioKeychainKey.token.keyName) {
-                    let json = try! JSONSerialization.jsonObject(with: data, options: [])
+                if let data = self.keychain.getData(RioKeychainKey.token.keyName),
+                   let json = try? JSONSerialization.jsonObject(with: data, options: []) {
                     if let tokenData = Mapper<RioTokenData>().map(JSONObject: json), let accessToken = tokenData.accessToken {
                         return accessToken
                     }
@@ -450,7 +439,7 @@ public class Rio {
     }
     
     // MARK: - Private methods
-    private func getTokenData() throws -> RioTokenData {
+    private func getTokenData() throws -> RioTokenData? {
         logger.log("getTokenData called")
         
         let now = self.safeNow
@@ -491,15 +480,15 @@ public class Rio {
         }
         
         // Get anonym token
-        return try self.getAnonymToken()
+        return nil // try self.getAnonymToken()
     }
     
     private func saveTokenData(tokenData: RioTokenData?, isForCustomTokenFlow: Bool = false) {
         logger.log("saveTokenData called with tokenData")
         var storedUserId: String? = nil
         // First get last stored token data from keychain.
-        if let data = self.keychain.getData(RioKeychainKey.token.keyName) {
-            let json = try! JSONSerialization.jsonObject(with: data, options: [])
+        if let data = self.keychain.getData(RioKeychainKey.token.keyName),
+           let json = try? JSONSerialization.jsonObject(with: data, options: []) {
             if let storedTokenData = Mapper<RioTokenData>().map(JSONObject: json), let accessToken = storedTokenData.accessToken {
                 let jwt = try! decode(jwt: accessToken)
                 if let userId = jwt.claim(name: "userId").string {
@@ -512,7 +501,6 @@ public class Rio {
         tokenDataWithDeltaTime?.deltaTime = deltaTime
         
         guard let tokenData = tokenDataWithDeltaTime else {
-            
             if storedUserId != nil {
                 DispatchQueue.main.async {
                     if !isForCustomTokenFlow {
@@ -527,19 +515,18 @@ public class Rio {
         }
         
         let obj = Mapper<RioTokenData>().toJSON(tokenData)
-        let data = try! JSONSerialization.data(withJSONObject: obj, options: .prettyPrinted)
-        self.keychain.set(data, forKey: RioKeychainKey.token.keyName)
+        guard let data = try? JSONSerialization.data(withJSONObject: obj, options: .prettyPrinted) else { return }
+        keychain.set(data, forKey: RioKeychainKey.token.keyName)
         
         logger.log("saveTokenData 2")
         
-        if let accessToken = tokenData.accessToken {
-            let jwt = try! decode(jwt: accessToken)
-            if let userId = jwt.claim(name: "userId").string, let anonymous = jwt.claim(name: "anonymous").rawValue as? Bool {
-                
+        if let accessToken = tokenData.accessToken,
+           let jwt = try? decode(jwt: accessToken) {
+            if let userId = jwt.claim(name: "userId").string {
                 if userId != storedUserId {
                     logger.log("userId \(userId) - stored: \(storedUserId ?? "-")")
                     // User has changed.
-                    let user = RioUser(uid: userId, isAnonymous: anonymous)
+                    let user = RioUser(uid: userId, isAnonymous: false)
                     
                     logger.log("initFirebaseApp 1")
                     if let app = self.firebaseApp, let customToken = tokenData.firebase?.customToken {
@@ -554,17 +541,13 @@ public class Rio {
                     }
                     
                     DispatchQueue.main.async {
-                        if anonymous {
-                            self.delegate?.rioClient(client: self, authStatusChanged: .signedInAnonymously(user: user))
-                        } else {
-                            self.delegate?.rioClient(client: self, authStatusChanged: .signedIn(user: user))
-                        }
+                        self.delegate?.rioClient(client: self, authStatusChanged: .signedIn(user: user))
                     }
                 } else {
                     configureFirebase(with: tokenData)
                     if let app = self.firebaseApp, let customToken = tokenData.firebase?.customToken {
                         if Auth.auth(app: app).currentUser?.uid == nil {
-                            let user = RioUser(uid: userId, isAnonymous: anonymous)
+                            let user = RioUser(uid: userId, isAnonymous: false)
                             logger.log("initFirebaseApp 2")
                             self.logger.log("FIREBASE custom auth \(userId)")
                             
@@ -575,11 +558,7 @@ public class Rio {
                             _ = self.firebaseAuthSemaphore.wait(wallTimeout: .distantFuture)
                             
                             DispatchQueue.main.async {
-                                if anonymous {
-                                    self.delegate?.rioClient(client: self, authStatusChanged: .signedInAnonymously(user: user))
-                                } else {
-                                    self.delegate?.rioClient(client: self, authStatusChanged: .signedIn(user: user))
-                                }
+                                self.delegate?.rioClient(client: self, authStatusChanged: .signedIn(user: user))
                             }
                         } else {
                             logger.log("already authorized Firebase user with uid: \(Auth.auth(app: app).currentUser?.uid ?? "")")
@@ -733,7 +712,7 @@ public class Rio {
     }
     
     private func executeAction(
-        tokenData: RioTokenData,
+        tokenData: RioTokenData?,
         action: String,
         data: [String: Any],
         culture: String?,
@@ -743,7 +722,7 @@ public class Rio {
         logger.log("executeAction called")
         let req = ExecuteActionRequest()
         req.projectId = self.projectId
-        req.accessToken = tokenData.accessToken
+        req.accessToken = tokenData?.accessToken
         req.actionName = action
         req.payload = data
         req.headers = headers
@@ -946,7 +925,7 @@ public class Rio {
                 
                 let req = ExecuteActionRequest()
                 req.projectId = self.projectId
-                req.accessToken = tokenData.accessToken
+                req.accessToken = tokenData?.accessToken
                 req.actionName = actionName
                 req.payload = data
                 
