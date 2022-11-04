@@ -309,7 +309,7 @@ public class Rio {
     public var delegate: RioClientDelegate? {
         didSet {
             // Check token data and raise status update
-            if let data = self.keychain.getData(RioKeychainKey.token.keyName),
+            if let data = keychain.getData(RioKeychainKey.token.keyName),
                let json = try? JSONSerialization.jsonObject(with: data, options: []) {
                 
                 if let tokenData = Mapper<RioTokenData>().map(JSONObject: json),
@@ -317,15 +317,18 @@ public class Rio {
                     
                     configureFirebase(with: tokenData)
                     
-                    let jwt = try! decode(jwt: accessToken)
-                    if let userId = jwt.claim(name: "userId").string {
-                        // User has changed.
+                    if let jwt = try? decode(jwt: accessToken),
+                       let userId = jwt.claim(name: "userId").string {
                         let user = RioUser(uid: userId, isAnonymous: false)
-                        self.delegate?.rioClient(client: self, authStatusChanged: .signedIn(user: user))
+                        delegate?.rioClient(client: self, authStatusChanged: .signedIn(user: user))
                     } else {
-                        self.delegate?.rioClient(client: self, authStatusChanged: .signedOut)
+                        delegate?.rioClient(client: self, authStatusChanged: .signedOut)
                     }
+                } else {
+                    delegate?.rioClient(client: self, authStatusChanged: .signedOut)
                 }
+            } else {
+                delegate?.rioClient(client: self, authStatusChanged: .signedOut)
             }
         }
     }
