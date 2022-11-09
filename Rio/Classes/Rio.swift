@@ -1324,6 +1324,7 @@ public class RioCloudObjectState {
     }
     
     public func subscribe(
+        retryCount: Int = 0,
         onSuccess: @escaping ([String: Any]?) -> Void,
         onError: @escaping (Error) -> Void
     ) {
@@ -1355,7 +1356,14 @@ public class RioCloudObjectState {
             listener = database.document(path)
                 .addSnapshotListener { (snap, error) in
                     guard error == nil else {
-                        onError(error!)
+                        if retryCount < 4 {
+                            let delay = Double(retryCount + 1) * 0.1
+                            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                                self.subscribe(retryCount: retryCount + 1, onSuccess: onSuccess, onError: onError)
+                            }
+                        } else {
+                            onError(error!)
+                        }
                         return
                     }
                     
@@ -1366,7 +1374,14 @@ public class RioCloudObjectState {
             listener = database.document(path)
                 .addSnapshotListener { (snap, error) in
                     guard error == nil else {
-                        onError(error!)
+                        if retryCount < 4 {
+                            let delay = Double(retryCount + 1) * 0.1
+                            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                                self.subscribe(retryCount: retryCount + 1, onSuccess: onSuccess, onError: onError)
+                            }
+                        } else {
+                            onError(error!)
+                        }
                         return
                     }
                     
@@ -1375,7 +1390,14 @@ public class RioCloudObjectState {
         case .public:
             listener = database.document(path).addSnapshotListener { (snap, error) in
                 guard error == nil else {
-                    onError(error!)
+                    if retryCount < 4 {
+                        let delay = Double(retryCount + 1) * 0.1
+                        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                            self.subscribe(retryCount: retryCount + 1, onSuccess: onSuccess, onError: onError)
+                        }
+                    } else {
+                        onError(error!)
+                    }
                     return
                 }
                 

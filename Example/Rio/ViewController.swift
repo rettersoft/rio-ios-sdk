@@ -77,5 +77,8 @@ class ViewController: UIViewController {
 extension ViewController : RioClientDelegate {
     func rioClient(client: Rio, authStatusChanged toStatus: RioClientAuthStatus) {
         print("-- RioDebug in VC Auth status \(toStatus)")
+        if case let .signedIn(rioUser) = toStatus {
+            print(rioUser.uid, rioUser.isAnonymous)
+        }
     }
 }
