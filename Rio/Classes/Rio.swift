@@ -541,6 +541,17 @@ public class Rio {
                         }
                         
                         _ = self.firebaseAuthSemaphore.wait(wallTimeout: .distantFuture)
+                    } else {
+                        configureFirebase(with: tokenData)
+                        self.logger.log("FIREBASE custom auth 2 \(userId)")
+                        if let app = self.firebaseApp, let customToken = tokenData.firebase?.customToken {
+                            Auth.auth(app: app).signIn(withCustomToken: customToken) { [weak self] (resp, error)  in
+                                self?.logger.log("FIREBASE custom auth COMPLETE user 2: \(resp?.user as Any)")
+                                self?.firebaseAuthSemaphore.signal()
+                            }
+                            
+                            _ = self.firebaseAuthSemaphore.wait(wallTimeout: .distantFuture)
+                        }
                     }
                     
                     DispatchQueue.main.async {
