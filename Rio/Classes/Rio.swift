@@ -747,6 +747,8 @@ public class Rio {
         req.httpMethod = cloudObjectOptions?.httpMethod
         req.method = cloudObjectOptions?.method
         req.queryString = cloudObjectOptions?.queryString
+        req.isStaticMethod = cloudObjectOptions?.isStaticMethod
+        req.path = cloudObjectOptions?.path
         
         var errorResponse: BaseErrorResponse?
         
@@ -1014,6 +1016,72 @@ public class Rio {
             }
         }
     }
+    
+    // MARK: - Make Static Call
+    public func makeStaticCall(
+        with options: RioCloudObjectOptions,
+        onSuccess: @escaping (RioCloudObjectResponse) -> Void,
+        onError: @escaping (RioCloudObjectError) -> Void) {
+            guard options.classID != nil,  options.method != nil else {
+                logger.log("You must include classId and method name while making static calls")
+                return
+            }
+            
+            var options2 = options
+            options2.isStaticMethod = true
+            
+            let parameters: [String: Any] = options.body?.compactMapValues( { $0 }) ?? [:]
+            let headers = options.headers?.compactMapValues( { $0 } ) ?? [:]
+            
+            if let encodingWarning = parameters.toEncodableDictionary().1 {
+                logger.log(encodingWarning)
+            }
+                        
+            self.send(
+                action: "rbs.core.request.CALL",
+                data: parameters,
+                headers: headers,
+                cloudObjectOptions: options2
+            ) { (response) in
+                if let objectResponse = response.first as? RioCloudObjectResponse {
+                    onSuccess(objectResponse)
+                } else {
+                    let errorResponse = RioCloudObjectResponse(statusCode: -1, headers: nil, body: response.first as? Data)
+                    onError(RioCloudObjectError(error: .parsingError, response: errorResponse))
+                }
+            } onError: { [weak self] (error) in
+                if let error = error as? BaseErrorResponse, let cloudObjectResponse = error.cloudObjectResponse {
+                    if let statusCode = error.cloudObjectResponse?.statusCode, statusCode == 570 {
+                        let config = options2.retryConfig ?? (self?.config.retryConfig ?? RetryConfig())
+                        let remaining = config.count - 1
+                        self?.logger.log("Remaining count for retry -> \(remaining)")
+                        if remaining < 1 {
+                            let specialResponse = RioCloudObjectResponse(statusCode: 570, headers: nil, body: nil)
+                            onError(RioCloudObjectError(error: .methodReturnedError, response: specialResponse))
+                            return
+                        } else {
+                            let delay = config.delay * config.rate
+                            let newRetryConfig = RetryConfig(delay: delay, rate: config.rate, count: remaining)
+                            var newOptions = options2
+                            newOptions.retryConfig = newRetryConfig
+                            DispatchQueue.main.asyncAfter(deadline: .now() + delay/Double(1000)) {
+                                self?.makeStaticCall(with: newOptions, onSuccess: onSuccess, onError: onError)
+                            }
+                            return
+                        }
+                    }
+                    if let errorData = cloudObjectResponse.body,
+                       let validatationError = try? JSONDecoder().decode(ValidationError.self, from: errorData),
+                       let issues = validatationError.issues {
+                        onError(RioCloudObjectError(error: .validationError(validationIssues: issues), response: cloudObjectResponse))
+                    } else if let moyaError = error.moyaError {
+                        onError(RioCloudObjectError(error: .moyaError(moyaError), response: cloudObjectResponse))
+                    } else {
+                        onError(RioCloudObjectError(error: .methodReturnedError, response: cloudObjectResponse))
+                    }
+                }
+            }
+        }
     
     // MARK: - Get Cloud Object
     
@@ -1439,7 +1507,9 @@ public struct RioCloudObjectOptions {
     public var queryString: [String: Any]?
     public var httpMethod: Moya.Method?
     public var body: [String: Any]?
+    public var path: String?
     public var useLocal: Bool?
+    public var isStaticMethod: Bool?
     public var culture: String?
     public var retryConfig: RetryConfig?
     
@@ -1452,7 +1522,9 @@ public struct RioCloudObjectOptions {
         queryString: [String: Any]? = nil,
         httpMethod: Moya.Method? = nil,
         body: [String: Any]? = nil,
+        path: String? = nil,
         useLocal: Bool? = nil,
+        isStaticMethod: Bool? = nil,
         culture: String? = nil,
         retryConfig: RetryConfig? = nil
     ) {
@@ -1464,7 +1536,9 @@ public struct RioCloudObjectOptions {
         self.queryString = queryString
         self.httpMethod = httpMethod
         self.body = body
+        self.path = path
         self.useLocal = useLocal
+        self.isStaticMethod = isStaticMethod
         self.culture = culture == nil ? defaultCulture : culture
         self.retryConfig = retryConfig
     }

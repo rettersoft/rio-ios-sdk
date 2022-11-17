@@ -40,7 +40,25 @@ enum RioService {
                 }
 
                 if request.actionName == "rbs.core.request.CALL" {
-                    return "/\(request.projectId!)/CALL/\(request.classID ?? "")/\(request.method ?? "")/\(request.instanceID ?? "")"
+                    if request.isStaticMethod ?? false {
+                        var thePath = "/\(request.projectId!)/CALL/\(request.classID ?? "")/\(request.method ?? "")"
+                        if let endPath = request.path {
+                            if endPath.first != "/" {
+                                thePath.append("/")
+                            }
+                            thePath.append(contentsOf: endPath)
+                        }
+                        return thePath
+                    } else {
+                        var thePath = "/\(request.projectId!)/CALL/\(request.classID ?? "")/\(request.method ?? "")/\(request.instanceID ?? "")"
+                        if let endPath = request.path {
+                            if endPath.first != "/" {
+                                thePath.append("/")
+                            }
+                            thePath.append(contentsOf: endPath)
+                        }
+                        return thePath
+                    }
                 }
                 
                 if let instanceID = request.instanceID {
@@ -252,7 +270,7 @@ extension RioService: TargetType, AccessTokenAuthorizable {
         var headers: [String: String] = [:]
         headers["Content-Type"] = "application/json"
         headers["x-rio-sdk-client"] = "ios"
-        headers["rio-sdk-version"] = "0.0.43"
+        headers["rio-sdk-version"] = "0.0.44"
         
         switch self {
         case .executeAction(let request):

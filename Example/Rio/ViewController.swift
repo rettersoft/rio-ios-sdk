@@ -13,7 +13,7 @@ class ViewController: UIViewController {
     
     
     
-    let rio = Rio.init(config: RioConfig(projectId: "15gs19h2ek", sslPinningEnabled: true, isLoggingEnabled: true, culture: "sl-TR"))
+    let rio = Rio.init(config: RioConfig(projectId: "15gs19h2ek", sslPinningEnabled: true, isLoggingEnabled: true, culture: "tr-tr"))
     
     var rioObj:RioCloudObject?
     
@@ -27,20 +27,12 @@ class ViewController: UIViewController {
     }
     
     @IBAction func btnGetObjectTapped(_ sender: Any) {
-        
-        if rioObj != nil { return }
-        
-        
-        
-        
         rio.getCloudObject(with: RioCloudObjectOptions(classID: "Test")) { object in
             
             print("InstanceId is \(object.instanceId)")
             
             self.rioObj = object
-            
-//            self.rioObj?.call(with: RioCloudObjectOptions(, onSuccess: <#T##(RioCloudObjectResponse) -> Void#>, onError: <#T##(RioCloudObjectError) -> Void#>)
-            
+                        
             self.rioObj?.state?.public.subscribe(onSuccess: { data in
                 if let data = data, let r = data["r"] {
                     print("\(r)")
@@ -54,8 +46,6 @@ class ViewController: UIViewController {
         } onError: { error in
             
         }
-        
-        
     }
     
     @IBAction func btnSayHelloTapped(_ sender: Any) {
@@ -71,6 +61,14 @@ class ViewController: UIViewController {
     @IBAction func signOutTapped(_ sender: Any) {
         rio.signOut()
         rioObj = nil
+    }
+    
+    private func exampleForStaticCall() {
+        rio.makeStaticCall(with: .init(classID: "ExampleProject", method: "ExampleMethod")) { resp in
+
+        } onError: { RioCloudObjectError in
+
+        }
     }
 }
 

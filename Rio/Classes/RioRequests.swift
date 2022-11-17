@@ -83,6 +83,8 @@ class ExecuteActionRequest : Mappable {
     var httpMethod: Moya.Method?
     var method: String?
     var queryString: [String: Any]?
+    var path: String?
+    var isStaticMethod: Bool?
     
     required init?(map: Map) { }
     
