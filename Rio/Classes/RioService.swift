@@ -270,7 +270,7 @@ extension RioService: TargetType, AccessTokenAuthorizable {
         var headers: [String: String] = [:]
         headers["Content-Type"] = "application/json"
         headers["x-rio-sdk-client"] = "ios"
-        headers["rio-sdk-version"] = "0.0.44"
+        headers["rio-sdk-version"] = "0.0.45"
         
         switch self {
         case .executeAction(let request):

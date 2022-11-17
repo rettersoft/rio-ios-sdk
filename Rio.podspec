@@ -8,7 +8,7 @@
 
 Pod::Spec.new do |s|
   s.name             = 'Rio'
-  s.version          = '0.0.44'
+  s.version          = '0.0.45'
   s.summary          = 'A short description of Rio.'
 
 # This description is used to generate tags and improve search results.
@@ -49,9 +49,9 @@ TODO: Add long description of the pod here.
   s.dependency 'ObjectMapper', '~> 3.4'
   s.dependency 'KeychainSwift', '~> 19.0'
   s.dependency 'JWTDecode', '~> 2.4'
-  s.dependency 'Firebase', '~> 9.5.0'
-  s.dependency 'Firebase/Firestore', '~> 9.5.0'
-  s.dependency 'Firebase/Auth', '~> 9.5.0'
+  s.dependency 'Firebase', '~> 10.2.0'
+  s.dependency 'Firebase/Firestore', '~> 10.2.0'
+  s.dependency 'Firebase/Auth', '~> 10.2.0'
 
   
   
