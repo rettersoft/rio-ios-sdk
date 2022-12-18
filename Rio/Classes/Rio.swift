@@ -445,8 +445,6 @@ public class Rio {
     private func getTokenData() throws -> RioTokenData? {
         logger.log("getTokenData called")
         
-        let now = self.safeNow
-        
         if let data = self.keychain.getData(RioKeychainKey.token.keyName) {
             
             let json = try! JSONSerialization.jsonObject(with: data, options: [])
@@ -461,7 +459,9 @@ public class Rio {
                 
                 deltaTime = tokenData.deltaTime ?? 0
                 
-                if(projectId == self.projectId) {
+                let now = self.safeNow
+                
+                if projectId == self.projectId {
                     logger.log("refreshTokenExpiresAt \(refreshTokenExpiresAt)")
                     logger.log("accessTokenExpiresAt \(accessTokenExpiresAt)")
                     if refreshTokenExpiresAt > now && accessTokenExpiresAt > now {
@@ -486,7 +486,7 @@ public class Rio {
         return nil // try self.getAnonymToken()
     }
     
-    private func saveTokenData(tokenData: RioTokenData?, isForCustomTokenFlow: Bool = false) {
+    private func saveTokenData(tokenData: RioTokenData?) {
         logger.log("saveTokenData called with tokenData")
         var storedUserId: String? = nil
         // First get last stored token data from keychain.
@@ -504,22 +504,14 @@ public class Rio {
         tokenDataWithDeltaTime?.deltaTime = deltaTime
         
         guard let tokenData = tokenDataWithDeltaTime else {
-            if storedUserId != nil {
-                DispatchQueue.main.async {
-                    if !isForCustomTokenFlow {
-                        self.delegate?.rioClient(client: self, authStatusChanged: .signedOut)
-                    }
-                }
-            }
-            
+            self.delegate?.rioClient(client: self, authStatusChanged: .signedOut)
             self.keychain.delete(RioKeychainKey.token.keyName)
-            
             return
         }
         
         let obj = Mapper<RioTokenData>().toJSON(tokenData)
         guard let data = try? JSONSerialization.data(withJSONObject: obj, options: .prettyPrinted) else { return }
-        keychain.set(data, forKey: RioKeychainKey.token.keyName)
+        keychain.set(data, forKey: RioKeychainKey.token.keyName) // ??
         
         logger.log("saveTokenData 2")
         
@@ -579,7 +571,11 @@ public class Rio {
                         }
                     }
                 }
+            } else {
+                signOut()
             }
+        } else {
+            signOut()
         }
     }
     
@@ -818,7 +814,7 @@ public class Rio {
         logger.log("authenticateWithCustomToken called")
         serialQueue.async {
             
-            self.saveTokenData(tokenData: nil, isForCustomTokenFlow: true)
+            self.saveTokenData(tokenData: nil)
             let req = AuthWithCustomTokenRequest()
             req.customToken = customToken
             
@@ -839,6 +835,7 @@ public class Rio {
                             tokenData.isAnonym = false
                             self?.serialQueue.async {
                                 self?.saveTokenData(tokenData: tokenData)
+                                self?.checkForDeltaTime(for: tokenData.accessToken)
                                 authSuccess?(true, nil)
                             }
                         } else {
