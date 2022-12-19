@@ -445,8 +445,6 @@ public class Rio {
     private func getTokenData() throws -> RioTokenData? {
         logger.log("getTokenData called")
         
-        let now = self.safeNow
-        
         if let data = self.keychain.getData(RioKeychainKey.token.keyName) {
             
             let json = try! JSONSerialization.jsonObject(with: data, options: [])
@@ -461,7 +459,9 @@ public class Rio {
                 
                 deltaTime = tokenData.deltaTime ?? 0
                 
-                if(projectId == self.projectId) {
+                let now = self.safeNow
+                
+                if projectId == self.projectId {
                     logger.log("refreshTokenExpiresAt \(refreshTokenExpiresAt)")
                     logger.log("accessTokenExpiresAt \(accessTokenExpiresAt)")
                     if refreshTokenExpiresAt > now && accessTokenExpiresAt > now {
@@ -482,11 +482,10 @@ public class Rio {
             }
         }
         
-        // Get anonym token
-        return nil // try self.getAnonymToken()
+        return nil
     }
     
-    private func saveTokenData(tokenData: RioTokenData?, isForCustomTokenFlow: Bool = false) {
+    private func saveTokenData(tokenData: RioTokenData?) {
         logger.log("saveTokenData called with tokenData")
         var storedUserId: String? = nil
         // First get last stored token data from keychain.
@@ -504,22 +503,14 @@ public class Rio {
         tokenDataWithDeltaTime?.deltaTime = deltaTime
         
         guard let tokenData = tokenDataWithDeltaTime else {
-            if storedUserId != nil {
-                DispatchQueue.main.async {
-                    if !isForCustomTokenFlow {
-                        self.delegate?.rioClient(client: self, authStatusChanged: .signedOut)
-                    }
-                }
-            }
-            
+            self.delegate?.rioClient(client: self, authStatusChanged: .signedOut)
             self.keychain.delete(RioKeychainKey.token.keyName)
-            
             return
         }
         
         let obj = Mapper<RioTokenData>().toJSON(tokenData)
         guard let data = try? JSONSerialization.data(withJSONObject: obj, options: .prettyPrinted) else { return }
-        keychain.set(data, forKey: RioKeychainKey.token.keyName)
+        keychain.set(data, forKey: RioKeychainKey.token.keyName) // ??
         
         logger.log("saveTokenData 2")
         
@@ -579,53 +570,12 @@ public class Rio {
                         }
                     }
                 }
+            } else {
+                signOut()
             }
+        } else {
+            signOut()
         }
-    }
-    
-    private func getAnonymToken() throws -> RioTokenData {
-        logger.log("getAnonymToken called")
-        
-        let getAnonymTokenRequest = GetAnonymTokenRequest()
-        getAnonymTokenRequest.projectId = self.config.projectId
-        
-        var retVal: RioTokenData? = nil
-        var errorResponse: BaseErrorResponse?
-        
-        self.service.request(.getAnonymToken(request: getAnonymTokenRequest)) { [weak self] result in
-            switch result {
-            case .success(let response):
-                if (200...299).contains(response.statusCode),
-                   let resp = try? response.map(RioTokenResponse.self) {
-                    self?.checkForDeltaTime(for: resp.response.accessToken)
-                    retVal = resp.response
-                    
-                    self?.configureFirebase(with: resp.response)
-                } else {
-                    errorResponse = BaseErrorResponse()
-                    errorResponse?.cloudObjectResponse = RioCloudObjectResponse(statusCode: response.statusCode, headers: nil, body: nil)
-                    errorResponse?.httpStatusCode = response.statusCode
-                }
-            case .failure(let f):
-                errorResponse = BaseErrorResponse()
-                errorResponse?.cloudObjectResponse = RioCloudObjectResponse(statusCode: -1, headers: nil, body: nil)
-                errorResponse?.httpStatusCode = -1
-                errorResponse?.moyaError = f
-            }
-            self?.semaphore.signal()
-        }
-        _ = self.semaphore.wait(wallTimeout: .distantFuture)
-        
-        retVal?.projectId = self.config.projectId
-        retVal?.isAnonym = true
-        
-        if let e = errorResponse {
-            throw e
-        }
-        if let r = retVal {
-            return r
-        }
-        throw "Can't get anonym token"
     }
     
     private func refreshToken(tokenData: RioTokenData) throws -> RioTokenData {
@@ -662,7 +612,6 @@ public class Rio {
             self?.semaphore.signal()
         }
         _ = self.semaphore.wait(wallTimeout: .distantFuture)
-        
         retVal?.projectId = tokenData.projectId
         retVal?.isAnonym = tokenData.isAnonym
         
@@ -676,6 +625,7 @@ public class Rio {
     }
     
     private func checkForDeltaTime(for token: String?) {
+        logger.log("Checking for the delta between the server time and the device time")
         guard let accessToken = token,
               let jwt = try? decode(jwt: accessToken),
               let serverTime = jwt.claim(name: "iat").integer else {
@@ -818,7 +768,7 @@ public class Rio {
         logger.log("authenticateWithCustomToken called")
         serialQueue.async {
             
-            self.saveTokenData(tokenData: nil, isForCustomTokenFlow: true)
+            self.saveTokenData(tokenData: nil)
             let req = AuthWithCustomTokenRequest()
             req.customToken = customToken
             
@@ -839,6 +789,7 @@ public class Rio {
                             tokenData.isAnonym = false
                             self?.serialQueue.async {
                                 self?.saveTokenData(tokenData: tokenData)
+                                self?.checkForDeltaTime(for: tokenData.accessToken)
                                 authSuccess?(true, nil)
                             }
                         } else {
