@@ -482,8 +482,7 @@ public class Rio {
             }
         }
         
-        // Get anonym token
-        return nil // try self.getAnonymToken()
+        return nil
     }
     
     private func saveTokenData(tokenData: RioTokenData?) {
@@ -579,51 +578,6 @@ public class Rio {
         }
     }
     
-    private func getAnonymToken() throws -> RioTokenData {
-        logger.log("getAnonymToken called")
-        
-        let getAnonymTokenRequest = GetAnonymTokenRequest()
-        getAnonymTokenRequest.projectId = self.config.projectId
-        
-        var retVal: RioTokenData? = nil
-        var errorResponse: BaseErrorResponse?
-        
-        self.service.request(.getAnonymToken(request: getAnonymTokenRequest)) { [weak self] result in
-            switch result {
-            case .success(let response):
-                if (200...299).contains(response.statusCode),
-                   let resp = try? response.map(RioTokenResponse.self) {
-                    self?.checkForDeltaTime(for: resp.response.accessToken)
-                    retVal = resp.response
-                    
-                    self?.configureFirebase(with: resp.response)
-                } else {
-                    errorResponse = BaseErrorResponse()
-                    errorResponse?.cloudObjectResponse = RioCloudObjectResponse(statusCode: response.statusCode, headers: nil, body: nil)
-                    errorResponse?.httpStatusCode = response.statusCode
-                }
-            case .failure(let f):
-                errorResponse = BaseErrorResponse()
-                errorResponse?.cloudObjectResponse = RioCloudObjectResponse(statusCode: -1, headers: nil, body: nil)
-                errorResponse?.httpStatusCode = -1
-                errorResponse?.moyaError = f
-            }
-            self?.semaphore.signal()
-        }
-        _ = self.semaphore.wait(wallTimeout: .distantFuture)
-        
-        retVal?.projectId = self.config.projectId
-        retVal?.isAnonym = true
-        
-        if let e = errorResponse {
-            throw e
-        }
-        if let r = retVal {
-            return r
-        }
-        throw "Can't get anonym token"
-    }
-    
     private func refreshToken(tokenData: RioTokenData) throws -> RioTokenData {
         logger.log("refreshToken called")
         
@@ -658,7 +612,6 @@ public class Rio {
             self?.semaphore.signal()
         }
         _ = self.semaphore.wait(wallTimeout: .distantFuture)
-        
         retVal?.projectId = tokenData.projectId
         retVal?.isAnonym = tokenData.isAnonym
         
@@ -672,6 +625,7 @@ public class Rio {
     }
     
     private func checkForDeltaTime(for token: String?) {
+        logger.log("Checking for the delta between the server time and the device time")
         guard let accessToken = token,
               let jwt = try? decode(jwt: accessToken),
               let serverTime = jwt.claim(name: "iat").integer else {
