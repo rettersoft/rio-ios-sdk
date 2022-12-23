@@ -485,7 +485,7 @@ public class Rio {
         return nil
     }
     
-    private func saveTokenData(tokenData: RioTokenData?) {
+    private func saveTokenData(tokenData: RioTokenData?, isForCustomTokenFlow: Bool = false) {
         logger.log("saveTokenData called with tokenData")
         var storedUserId: String? = nil
         // First get last stored token data from keychain.
@@ -503,7 +503,11 @@ public class Rio {
         tokenDataWithDeltaTime?.deltaTime = deltaTime
         
         guard let tokenData = tokenDataWithDeltaTime else {
-            self.delegate?.rioClient(client: self, authStatusChanged: .signedOut)
+            DispatchQueue.main.async {
+                if !isForCustomTokenFlow {
+                    self.delegate?.rioClient(client: self, authStatusChanged: .signedOut)
+                }
+            }
             self.keychain.delete(RioKeychainKey.token.keyName)
             return
         }
@@ -768,7 +772,7 @@ public class Rio {
         logger.log("authenticateWithCustomToken called")
         serialQueue.async {
             
-            self.saveTokenData(tokenData: nil)
+            self.saveTokenData(tokenData: nil, isForCustomTokenFlow: true)
             let req = AuthWithCustomTokenRequest()
             req.customToken = customToken
             
@@ -788,8 +792,8 @@ public class Rio {
                             tokenData.projectId = self?.config.projectId
                             tokenData.isAnonym = false
                             self?.serialQueue.async {
-                                self?.saveTokenData(tokenData: tokenData)
                                 self?.checkForDeltaTime(for: tokenData.accessToken)
+                                self?.saveTokenData(tokenData: tokenData)
                                 authSuccess?(true, nil)
                             }
                         } else {
