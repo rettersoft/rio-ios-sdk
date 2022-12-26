@@ -57,6 +57,7 @@ class SignOutRequest : Mappable {
     var projectId: String?
     var accessToken: String?
     var userId: String?
+    var type: String?
     
     required init?(map: Map) { }
     
@@ -66,6 +67,7 @@ class SignOutRequest : Mappable {
         projectId <- map["projectId"]
         accessToken <- map["accessToken"]
         userId <- map["userId"]
+        type <- map["type"]
     }
 }
 

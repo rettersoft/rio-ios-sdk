@@ -105,8 +105,10 @@ enum RioService {
         case .authWithCustomToken(let request):
             return ["customToken": request.customToken ?? ""]
         case .signout(let request):
-            return ["_token": request.accessToken ?? ""]
-            
+            return [
+                "_token": request.accessToken ?? "",
+                "type": request.type ?? ""
+            ]
         case .executeAction(let request):
             
             if cloudObjectActions.contains(request.actionName ?? "") {
@@ -270,7 +272,8 @@ extension RioService: TargetType, AccessTokenAuthorizable {
         var headers: [String: String] = [:]
         headers["Content-Type"] = "application/json"
         headers["x-rio-sdk-client"] = "iOS"
-        headers["rio-sdk-version"] = "0.0.47"
+        headers["rio-sdk-version"] = "0.0.48"
+        headers["installationId"] = String.getInstallationId()
         
         switch self {
         case .executeAction(let request):
@@ -340,5 +343,17 @@ extension Dictionary where Key == String {
             }
         }
         return (newDict, errorMessage)
+    }
+}
+
+extension String {
+    static func getInstallationId() -> String {
+        if let id = UserDefaults.standard.string(forKey: RioUserDefaultsKey.installationId.keyName) {
+            return id
+        } else {
+            let id = UUID().uuidString
+            UserDefaults.standard.set(id, forKey: RioUserDefaultsKey.installationId.keyName)
+            return id
+        }
     }
 }

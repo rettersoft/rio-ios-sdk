@@ -240,12 +240,14 @@ enum RioKeychainKey {
 }
 
 enum RioUserDefaultsKey {
-    case openedFirstTime
+    case openedFirstTime, installationId
     
     var keyName: String {
         switch self {
         case .openedFirstTime:
             return "io.retter.openedFirstTime"
+        case .installationId:
+            return "io.retter.installationId"
         }
     }
 }
@@ -575,10 +577,10 @@ public class Rio {
                     }
                 }
             } else {
-                signOut()
+                signOut(isSDK: true)
             }
         } else {
-            signOut()
+            signOut(isSDK: true)
         }
     }
     
@@ -604,14 +606,13 @@ public class Rio {
                     errorResponse = BaseErrorResponse()
                     errorResponse?.cloudObjectResponse = RioCloudObjectResponse(statusCode: response.statusCode, headers: nil, body: nil)
                     errorResponse?.httpStatusCode = response.statusCode
-                    self?.signOut()
+                    self?.signOut(isSDK: true)
                 }
             case .failure(let f):
                 errorResponse = BaseErrorResponse()
                 errorResponse?.cloudObjectResponse = RioCloudObjectResponse(statusCode: -1, headers: nil, body: nil)
                 errorResponse?.httpStatusCode = -1
                 errorResponse?.moyaError = f
-                self?.signOut()
             }
             self?.semaphore.signal()
         }
@@ -824,7 +825,7 @@ public class Rio {
         }
     }
     
-    public func signOut(authSuccess: ((Bool, RioError?) -> Void)? = nil) {
+    public func signOut(authSuccess: ((Bool, RioError?) -> Void)? = nil, isSDK: Bool = false) {
         
         if let data = self.keychain.getData(RioKeychainKey.token.keyName),
            let json = try? JSONSerialization.jsonObject(with: data, options: []) {
@@ -837,6 +838,7 @@ public class Rio {
                 req.accessToken = accessToken
                 req.projectId = projectId
                 req.userId = userId
+                req.type = isSDK ? "sdk" : "user"
                 
                 self.service.request(.signout(request: req)) { result in
                     switch result {
