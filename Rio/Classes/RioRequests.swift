@@ -24,6 +24,7 @@ class GetAnonymTokenRequest : Mappable {
 class RefreshTokenRequest : Mappable {
     var projectId: String?
     var refreshToken: String?
+    var accessToken: String?
     var userId: String?
     
     required init?(map: Map) { }
@@ -33,6 +34,7 @@ class RefreshTokenRequest : Mappable {
     func mapping(map: Map) {
         projectId <- map["projectId"]
         refreshToken <- map["refreshToken"]
+        accessToken <- map["accessToken"]
         userId <- map["userId"]
     }
 }
