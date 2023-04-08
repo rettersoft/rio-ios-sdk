@@ -71,11 +71,11 @@ enum RioService {
                 
             }
         case .refreshToken(let request):
-            return "/\(request.projectId ?? "")/TOKEN/refresh"
+            return "/\(request.projectId ?? "")/AUTH/refreshToken"
         case .authWithCustomToken(let request):
-            return "/\(request.projectId ?? "")/TOKEN/auth"
+            return "/\(request.projectId ?? "")/AUTH/authWithCustomToken"
         case .signout(let request):
-            return "/\(request.projectId ?? "")/TOKEN/signOut"
+            return "/\(request.projectId ?? "")/AUTH/signOut"
         }
     }
     
@@ -86,12 +86,6 @@ enum RioService {
                 return payload
             }
             return [:]
-        case .getAnonymToken(let request):
-            return ["projectId": request.projectId ?? ""]
-        case .refreshToken(let request):
-            return ["refreshToken": request.refreshToken ?? ""]
-        case .authWithCustomToken(let request):
-            return ["customToken": request.customToken ?? ""]
         default: return [:]
         }
     }
@@ -104,18 +98,24 @@ enum RioService {
     
     var urlParameters: [String: Any] {
         switch self {
+        case .getAnonymToken(let request):
+            return ["projectId": request.projectId ?? ""]
+        case .refreshToken(let request):
+            return ["refreshToken": request.refreshToken ?? ""]
+        case .authWithCustomToken(let request):
+            return ["customToken": request.customToken ?? ""]
         case .signout(let request):
             return [
-                // "_token": request.accessToken ?? "",
+                "_token": request.accessToken ?? "",
                 "type": request.type ?? ""
             ]
         case .executeAction(let request):
             
             if cloudObjectActions.contains(request.actionName ?? "") {
                 var parameters: [String: Any] = [:]
-//                if let token = request.accessToken {
-//                    parameters["_token"] = token
-//                }
+                if let token = request.accessToken {
+                    parameters["_token"] = token
+                }
                 
                 if let queryParameters = request.queryString {
                     for (key, value) in queryParameters {
@@ -146,12 +146,12 @@ enum RioService {
             }
             
             if let action = request.actionName {
-                // let accessToken = request.accessToken != nil ? request.accessToken! : ""
+                let accessToken = request.accessToken != nil ? request.accessToken! : ""
                 if(self.isGetAction(action)) {
                     let payload: [String: Any] = request.payload == nil ? [:] : request.payload!
                     
                     var parameters =  [
-                        // "auth": accessToken,
+                        "auth": accessToken,
                         "platform": "IOS"
                     ]
                     
@@ -166,7 +166,7 @@ enum RioService {
                     
                     return parameters
                 } else {
-                    var parameters: [String: String] = [:] // ["auth": accessToken]
+                    var parameters = ["auth": accessToken]
                     if let culture = request.culture {
                         parameters["culture"] = culture
                     }
@@ -176,15 +176,13 @@ enum RioService {
             } else {
                 return [:]
             }
-        default:
-            return [:]
         }
-        
     }
     
     var httpMethod: Moya.Method {
         switch self {
         case .executeAction(let request):
+
             let isExcludedAction = cloudObjectActions.contains(request.actionName ?? "")
 
             if !isExcludedAction {
@@ -196,8 +194,7 @@ enum RioService {
             } else {
                 return request.httpMethod ?? .post
             }
-        case .authWithCustomToken, .refreshToken, .signout:
-            return .post
+            
         default: return .get
         }
     }
@@ -258,11 +255,6 @@ extension RioService: TargetType, AccessTokenAuthorizable {
             return .requestCompositeParameters(bodyParameters: self.body,
                                                bodyEncoding: JSONEncoding.default,
                                                urlParameters: self.urlParameters)
-            
-        case .authWithCustomToken, .refreshToken, .signout:
-            return .requestCompositeParameters(bodyParameters: self.body,
-                                               bodyEncoding: JSONEncoding.default,
-                                               urlParameters: self.urlParameters)
         default:
             return .requestParameters(parameters: self.urlParameters, encoding: URLEncoding.default)
         }
@@ -280,7 +272,7 @@ extension RioService: TargetType, AccessTokenAuthorizable {
         var headers: [String: String] = [:]
         headers["Content-Type"] = "application/json"
         headers["x-rio-sdk-client"] = "iOS"
-        headers["rio-sdk-version"] = "0.0.49"
+        headers["rio-sdk-version"] = "0.0.48"
         headers["installationId"] = String.getInstallationId()
         
         switch self {
@@ -294,16 +286,8 @@ extension RioService: TargetType, AccessTokenAuthorizable {
                 }
             }
             
-            if let token = request.accessToken {
-                headers["Authorization"] = "Bearer \(token)"
-            }
-            
             headers["Content-Type"] = "application/json"
             break
-        case .signout(let request):
-            if let token = request.accessToken {
-                headers["Authorization"] = "Bearer \(token)"
-            }
         default:
             break
         }

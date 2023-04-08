@@ -475,6 +475,9 @@ public class Rio {
                     if refreshTokenExpiresAt > now && accessTokenExpiresAt < now {
                         logger.log("refreshing token")
                         // DO REFRESH
+                        let refreshTokenRequest = RefreshTokenRequest()
+                        refreshTokenRequest.refreshToken = refreshToken
+                        
                         return try self.refreshToken(tokenData: tokenData)
                     }
                 }
@@ -588,7 +591,6 @@ public class Rio {
         refreshTokenRequest.refreshToken = tokenData.refreshToken
         refreshTokenRequest.projectId = projectId
         refreshTokenRequest.userId = tokenData.userId
-        refreshTokenRequest.accessToken = tokenData.accessToken
         
         var retVal: RioTokenData? = nil
         var errorResponse: BaseErrorResponse?
