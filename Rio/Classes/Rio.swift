@@ -311,27 +311,7 @@ public class Rio {
     public var delegate: RioClientDelegate? {
         didSet {
             // Check token data and raise status update
-            if let data = keychain.getData(RioKeychainKey.token.keyName),
-               let json = try? JSONSerialization.jsonObject(with: data, options: []) {
-                
-                if let tokenData = Mapper<RioTokenData>().map(JSONObject: json),
-                   let accessToken = tokenData.accessToken {
-                    
-                    configureFirebase(with: tokenData)
-                    
-                    if let jwt = try? decode(jwt: accessToken),
-                       let userId = jwt.claim(name: "userId").string {
-                        let user = RioUser(uid: userId, isAnonymous: false)
-                        delegate?.rioClient(client: self, authStatusChanged: .signedIn(user: user))
-                    } else {
-                        delegate?.rioClient(client: self, authStatusChanged: .signedOut)
-                    }
-                } else {
-                    delegate?.rioClient(client: self, authStatusChanged: .signedOut)
-                }
-            } else {
-                delegate?.rioClient(client: self, authStatusChanged: .signedOut)
-            }
+            checkForAuthStatus()
         }
     }
     
@@ -452,7 +432,6 @@ public class Rio {
             let json = try! JSONSerialization.jsonObject(with: data, options: [])
             
             if let tokenData = Mapper<RioTokenData>().map(JSONObject: json),
-               let refreshToken = tokenData.refreshToken,
                let refreshTokenExpiresAt = tokenData.refreshTokenExpiresAt,
                let accessTokenExpiresAt = tokenData.accessTokenExpiresAt,
                let projectId = tokenData.projectId {
@@ -475,8 +454,6 @@ public class Rio {
                     if refreshTokenExpiresAt > now && accessTokenExpiresAt < now {
                         logger.log("refreshing token")
                         // DO REFRESH
-                        let refreshTokenRequest = RefreshTokenRequest()
-                        refreshTokenRequest.refreshToken = refreshToken
                         
                         return try self.refreshToken(tokenData: tokenData)
                     }
@@ -1155,6 +1132,34 @@ public class Rio {
                 }
             }
         }
+    }
+    
+    public func getAuthStatus() -> RioClientAuthStatus {
+        checkForAuthStatus(isForStatusChangeDelegation: false)
+    }
+    
+    @discardableResult
+    private  func checkForAuthStatus(isForStatusChangeDelegation: Bool = true) -> RioClientAuthStatus {
+        guard let data = keychain.getData(RioKeychainKey.token.keyName),
+              let json = try? JSONSerialization.jsonObject(with: data, options: []),
+              let tokenData = Mapper<RioTokenData>().map(JSONObject: json),
+              let accessToken = tokenData.accessToken,
+              let jwt = try? decode(jwt: accessToken),
+              let userId = jwt.claim(name: "userId").string else {
+            if isForStatusChangeDelegation {
+                delegate?.rioClient(client: self, authStatusChanged: .signedOut)
+            }
+            return .signedOut
+        }
+        
+        let user = RioUser(uid: userId, isAnonymous: false)
+        
+        if isForStatusChangeDelegation {
+            configureFirebase(with: tokenData)
+            delegate?.rioClient(client: self, authStatusChanged: .signedIn(user: user))
+        }
+        
+        return .signedIn(user: user)
     }
 }
 
