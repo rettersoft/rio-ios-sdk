@@ -272,7 +272,7 @@ extension RioService: TargetType, AccessTokenAuthorizable {
         var headers: [String: String] = [:]
         headers["Content-Type"] = "application/json"
         headers["x-rio-sdk-client"] = "iOS"
-        headers["rio-sdk-version"] = "0.0.50"
+        headers["rio-sdk-version"] = "0.0.51"
         headers["installationId"] = String.getInstallationId()
         
         switch self {
@@ -321,11 +321,12 @@ final class CachePolicyPlugin: PluginType {
 }
 
 extension Encodable {
-    var dict: [String: Any]? {
+    var dict: Any? {
         guard let data = try? JSONEncoder().encode(self) else {
             return nil
         }
-        return (try? JSONSerialization.jsonObject(with: data, options: .allowFragments)).flatMap { $0 as? [String: Any] }
+
+        return (try? JSONSerialization.jsonObject(with: data, options: .allowFragments))
     }
 }
 
