@@ -8,7 +8,7 @@
 
 Pod::Spec.new do |s|
   s.name             = 'Rio'
-  s.version          = '0.0.54'
+  s.version          = '0.0.55'
   s.summary          = 'A short description of Rio.'
 
 # This description is used to generate tags and improve search results.
@@ -41,6 +41,8 @@ TODO: Add long description of the pod here.
   s.pod_target_xcconfig = { 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'arm64' }
   s.user_target_xcconfig = { 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'arm64' }
 
+  s.swift_version = '5.0'
+
   # s.public_header_files = 'Pod/Classes/**/*.h'
   # s.frameworks = 'UIKit', 'MapKit'
   # s.dependency 'AFNetworking', '~> 2.3'
@@ -49,7 +51,6 @@ TODO: Add long description of the pod here.
   
   s.dependency 'Moya', '~> 14.0'
   s.dependency 'Alamofire', '~> 5.2'
-  s.dependency 'ObjectMapper', '~> 3.4'
   s.dependency 'KeychainSwift', '~> 22.0'
   s.dependency 'JWTDecode', '~> 2.4'
   s.dependency 'Firebase', '~> 10.2.0'

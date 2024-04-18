@@ -2,7 +2,6 @@
 import Alamofire
 import Moya
 import KeychainSwift
-import ObjectMapper
 import JWTDecode
 import Foundation
 import FirebaseCore
@@ -150,11 +149,11 @@ public struct RioUser {
     public var isAnonymous: Bool
 }
 
-struct RioTokenResponse: Decodable {
+struct RioTokenResponse: Codable {
     var response: RioTokenData
 }
 
-struct RioTokenData: Mappable, Decodable {
+struct RioTokenData: Codable {
     var projectId: String?
     var isAnonym: Bool?
     var uid: String?
@@ -192,22 +191,6 @@ struct RioTokenData: Mappable, Decodable {
             return id
         }
         return nil
-    }
-    
-    
-    init?(map: Map) {
-        
-    }
-    
-    mutating func mapping(map: Map) {
-        isAnonym <- map["isAnonym"]
-        projectId <- map["projectId"]
-        uid <- map["uid"]
-        accessToken <- map["accessToken"]
-        refreshToken <- map["refreshToken"]
-        firebaseToken <- map["firebaseToken"]
-        deltaTime <- map["deltaTime"]
-        firebase <- map["firebase"]
     }
 }
 
@@ -325,7 +308,7 @@ public class Rio {
             let accessTokenPlugin = AccessTokenPlugin { _ -> String in
                 if let data = self.keychain.getData(RioKeychainKey.token.keyName),
                    let json = try? JSONSerialization.jsonObject(with: data, options: []) {
-                    if let tokenData = Mapper<RioTokenData>().map(JSONObject: json), let accessToken = tokenData.accessToken {
+                    if let tokenData = try? JSONDecoder().decode(RioTokenData.self, from: data), let accessToken = tokenData.accessToken {
                         return accessToken
                     }
                 }
@@ -431,7 +414,7 @@ public class Rio {
             
             let json = try! JSONSerialization.jsonObject(with: data, options: [])
             
-            if let tokenData = Mapper<RioTokenData>().map(JSONObject: json),
+            if let tokenData = try? JSONDecoder().decode(RioTokenData.self, from: data),
                let refreshTokenExpiresAt = tokenData.refreshTokenExpiresAt,
                let accessTokenExpiresAt = tokenData.accessTokenExpiresAt,
                let projectId = tokenData.projectId {
@@ -470,7 +453,7 @@ public class Rio {
         // First get last stored token data from keychain.
         if let data = self.keychain.getData(RioKeychainKey.token.keyName),
            let json = try? JSONSerialization.jsonObject(with: data, options: []) {
-            if let storedTokenData = Mapper<RioTokenData>().map(JSONObject: json), let accessToken = storedTokenData.accessToken {
+            if let storedTokenData = try? JSONDecoder().decode(RioTokenData.self, from: data), let accessToken = storedTokenData.accessToken {
                 let jwt = try! decode(jwt: accessToken)
                 if let userId = jwt.claim(name: "userId").string {
                     storedUserId = userId
@@ -491,8 +474,8 @@ public class Rio {
             return
         }
         
-        let obj = Mapper<RioTokenData>().toJSON(tokenData)
-        guard let data = try? JSONSerialization.data(withJSONObject: obj, options: .prettyPrinted) else { return }
+        let obj = try? JSONEncoder().encode(tokenData)
+        guard let object = obj, let data = try? JSONSerialization.data(withJSONObject: object, options: .prettyPrinted) else { return }
         keychain.set(data, forKey: RioKeychainKey.token.keyName) // ??
         
         logger.log("saveTokenData 2")
@@ -807,7 +790,7 @@ public class Rio {
         if let data = self.keychain.getData(RioKeychainKey.token.keyName),
            let json = try? JSONSerialization.jsonObject(with: data, options: []) {
             
-            if let tokenData = Mapper<RioTokenData>().map(JSONObject: json),
+            if let tokenData = try? JSONDecoder().decode(RioTokenData.self, from: data),
                let accessToken = tokenData.accessToken,
                let userId = tokenData.userId {
                 
@@ -1044,7 +1027,7 @@ public class Rio {
             var userId = ""
             if let data = self.keychain.getData(RioKeychainKey.token.keyName),
                let json = try? JSONSerialization.jsonObject(with: data, options: []) {
-                if let storedTokenData = Mapper<RioTokenData>().map(JSONObject: json), let accessToken = storedTokenData.accessToken {
+                if let storedTokenData = try? JSONDecoder().decode(RioTokenData.self, from: data), let accessToken = storedTokenData.accessToken {
                     let jwt = try! decode(jwt: accessToken)
                     if let id = jwt.claim(name: "userId").string {
                         userId = id
@@ -1096,7 +1079,7 @@ public class Rio {
                 var userId: String?
                 if let data = self.keychain.getData(RioKeychainKey.token.keyName) {
                     let json = try! JSONSerialization.jsonObject(with: data, options: [])
-                    if let storedTokenData = Mapper<RioTokenData>().map(JSONObject: json), let accessToken = storedTokenData.accessToken {
+                    if let storedTokenData = try? JSONDecoder().decode(RioTokenData.self, from: data), let accessToken = storedTokenData.accessToken {
                         let jwt = try! decode(jwt: accessToken)
                         if let id = jwt.claim(name: "userId").string {
                             userId = id
@@ -1142,7 +1125,7 @@ public class Rio {
     private  func checkForAuthStatus(isForStatusChangeDelegation: Bool = true) -> RioClientAuthStatus {
         guard let data = keychain.getData(RioKeychainKey.token.keyName),
               let json = try? JSONSerialization.jsonObject(with: data, options: []),
-              let tokenData = Mapper<RioTokenData>().map(JSONObject: json),
+              let tokenData = try? JSONDecoder().decode(RioTokenData.self, from: data),
               let accessToken = tokenData.accessToken,
               let jwt = try? decode(jwt: accessToken),
               let userId = jwt.claim(name: "userId").string else {
@@ -1380,7 +1363,7 @@ public class RioCloudObjectState {
         var identity = userIdentity
         if userId.isEmpty, identity.isEmpty, let data = KeychainSwift().getData(RioKeychainKey.token.keyName),
            let json = try? JSONSerialization.jsonObject(with: data, options: []) {
-            if let storedTokenData = Mapper<RioTokenData>().map(JSONObject: json), let accessToken = storedTokenData.accessToken {
+            if let storedTokenData = try? JSONDecoder().decode(RioTokenData.self, from: data), let accessToken = storedTokenData.accessToken {
                 let jwt = try! decode(jwt: accessToken)
                 if let id = jwt.claim(name: "userId").string {
                     userId = id
@@ -1519,38 +1502,17 @@ public struct RioCloudObjectMethod: Decodable {
     let tag: String?
 }
 
-struct CloudOption: Decodable, Mappable {
+struct CloudOption: Codable {
     var customToken: String?
     var projectId: String?
     var apiKey: String?
     var envs: RioFirebaseEnv?
-    
-    init?(map: Map) {
-        
-    }
-    
-    mutating func mapping(map: Map) {
-        customToken <- map["customToken"]
-        projectId <- map["projectId"]
-        apiKey <- map["apiKey"]
-        envs <- map["envs"]
-    }
 }
 
-struct RioFirebaseEnv: Decodable, Mappable {
+struct RioFirebaseEnv: Codable {
     var iosAppId: String?
     var gcmSenderId: String?
-    
-    init?(map: Map) {
-        
-    }
-    
-    mutating func mapping(map: Map) {
-        iosAppId <- map["iosAppId"]
-        gcmSenderId <- map["gcmSenderId"]
-    }
 }
-
 
 public struct RioCloudObjectResponse: Codable {
     public let statusCode: Int

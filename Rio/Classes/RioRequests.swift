@@ -6,73 +6,32 @@
 //
 
 import Foundation
-import ObjectMapper
 import Moya
 
-class GetAnonymTokenRequest : Mappable {
+class GetAnonymTokenRequest: Codable {
     var projectId: String?
-    
-    required init?(map: Map) { }
-    
-    init() { }
-    
-    func mapping(map: Map) {
-        projectId <- map["projectId"]
-    }
 }
 
-class RefreshTokenRequest : Mappable {
+class RefreshTokenRequest: Codable {
     var projectId: String?
     var refreshToken: String?
     var userId: String?
-    
-    required init?(map: Map) { }
-    
-    init() { }
-    
-    func mapping(map: Map) {
-        projectId <- map["projectId"]
-        refreshToken <- map["refreshToken"]
-        userId <- map["userId"]
-    }
 }
 
-class AuthWithCustomTokenRequest : Mappable {
+class AuthWithCustomTokenRequest: Codable {
     var projectId: String?
     var customToken: String?
     var userId: String?
-    
-    required init?(map: Map) { }
-    
-    init() { }
-    
-    func mapping(map: Map) {
-        projectId <- map["projectId"]
-        customToken <- map["customToken"]
-        userId <- map["userId"]
-    }
 }
 
-class SignOutRequest : Mappable {
+class SignOutRequest: Codable {
     var projectId: String?
     var accessToken: String?
     var userId: String?
     var type: String?
-    
-    required init?(map: Map) { }
-    
-    init() { }
-    
-    func mapping(map: Map) {
-        projectId <- map["projectId"]
-        accessToken <- map["accessToken"]
-        userId <- map["userId"]
-        type <- map["type"]
-    }
 }
 
-class ExecuteActionRequest : Mappable {
-    
+class ExecuteActionRequest {
     var projectId: String?
     var accessToken:String?
     var actionName:String?
@@ -87,19 +46,4 @@ class ExecuteActionRequest : Mappable {
     var queryString: [String: Any]?
     var path: String?
     var isStaticMethod: Bool?
-    
-    required init?(map: Map) { }
-    
-    init() {
-    
-    }
-    
-    func mapping(map: Map) {
-        projectId <- map["projectId"]
-        accessToken <- map["accessToken"]
-        actionName <- map["actionName"]
-        payload <- map["payload"]
-        headers <- map["headers"]
-        culture <- map["culture"]
-    }
 }

@@ -8,7 +8,7 @@
 import Foundation
 import Moya
 
-
+/*
 class GetTokenResponse: Decodable {
     
     var accessToken: String?
@@ -57,7 +57,7 @@ class ExecuteActionResponse: Decodable {
         }
     }
 }
-
+*/
 
 enum NetworkError : Error {
     case connection_lost
