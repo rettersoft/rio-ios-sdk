@@ -37,22 +37,31 @@ Simply add [KeychainSwiftDistrib.swift](https://github.com/evgenyneu/keychain-sw
 
 #### Setup with Carthage (iOS 8+)
 
-Alternatively, add `github "evgenyneu/keychain-swift" ~> 19.0` to your Cartfile and run `carthage update`.
+Alternatively, add `github "evgenyneu/keychain-swift" ~> 22.0` to your Cartfile and run `carthage update`.
 
 #### Setup with CocoaPods (iOS 8+)
 
 If you are using CocoaPods add this text to your Podfile and run `pod install`.
 
-    use_frameworks!
-    target 'Your target name'
-    pod 'KeychainSwift', '~> 19.0'
+```
+use_frameworks!
+target 'Your target name'
+pod 'KeychainSwift', '~> 22.0'
+```
 
 
-#### Setup with Swift Package Manager
+#### Setup with Swift Package Manager (in project)
 
-* In Xcode 11+ select *File > Packages > Add Package Dependency...*.
+* In Xcode select *File > Add Packages*.
 * Enter this project's URL: https://github.com/evgenyneu/keychain-swift.git
 
+#### Setup with Swift Package Manager (in Swift Package)
+
+If you're using KeychainSwift in a Swift package, make sure to specify a `name`. This is because SPM cannot automatically resolve a name for a package that has a different Target name in its `Package.swift` (namely `KeychainSwift`) that differs from the repo link (`keychain-swift`).
+
+```
+.package(name: "KeychainSwift", url: "https://github.com/evgenyneu/keychain-swift.git", from: "22.0.0")
+```
 
 ## Legacy Swift versions
 
@@ -110,7 +119,8 @@ Use `withAccess` parameter to specify the security level of the keychain storage
 By default the `.accessibleWhenUnlocked` option is used. It is one of the most restrictive options and provides good data protection.
 
 ```
-KeychainSwift().set("Hello world", forKey: "key 1", withAccess: .accessibleWhenUnlocked)
+let keychain = KeychainSwift()
+keychain.set("Hello world", forKey: "key 1", withAccess: .accessibleWhenUnlocked)
 ```
 
 You can use `.accessibleAfterFirstUnlock` if you need your app to access the keychain item while in the background. Note that it is less secure than the `.accessibleWhenUnlocked` option.

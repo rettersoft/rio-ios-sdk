@@ -31,13 +31,21 @@ NS_ASSUME_NONNULL_BEGIN
 */
 typedef void (^FIRMultiFactorSessionCallback)(FIRMultiFactorSession *_Nullable session,
                                               NSError *_Nullable error)
-    NS_SWIFT_NAME(MultiFactorSessionCallback) API_UNAVAILABLE(macos, tvos, watchos);
+    NS_SWIFT_UNAVAILABLE("Use Swift's closure syntax instead.")
+        API_UNAVAILABLE(macos, tvos, watchos);
 
 /**
-   @brief The string identifier for second factors. e.g. "phone".
+   @brief The string identifier for using phone as a second factor.
         This constant is available on iOS only.
 */
 extern NSString *const _Nonnull FIRPhoneMultiFactorID NS_SWIFT_NAME(PhoneMultiFactorID)
+    API_UNAVAILABLE(macos, tvos, watchos);
+
+/**
+   @brief The string identifier for using TOTP as a second factor.
+        This constant is available on iOS only.
+*/
+extern NSString *const _Nonnull FIRTOTPMultiFactorID NS_SWIFT_NAME(TOTPMultiFactorID)
     API_UNAVAILABLE(macos, tvos, watchos);
 
 /** @class FIRMultiFactor
@@ -59,7 +67,7 @@ NS_SWIFT_NAME(MultiFactor) API_UNAVAILABLE(macos, tvos, watchos) @interface FIRM
                                                     NSError *_Nullable error))completion;
 
 /** @fn enrollWithAssertion:displayName:completion:
-    @brief Enrolls a second factor as identified by the `FIRMultiFactorAssertion` parameter for the
+    @brief Enrolls a second factor as identified by the `MultiFactorAssertion` parameter for the
         current user.
     @param displayName An optional display name associated with the multi factor to enroll.
     @param completion The block invoked when the request is complete, or fails.

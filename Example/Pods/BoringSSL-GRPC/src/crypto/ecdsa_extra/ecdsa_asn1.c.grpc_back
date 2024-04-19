@@ -50,16 +50,16 @@
  * (eay@cryptsoft.com).  This product includes software written by Tim
  * Hudson (tjh@cryptsoft.com). */
 
-#include <openssl/ecdsa.h>
+#include <openssl_grpc/ecdsa.h>
 
 #include <limits.h>
 #include <string.h>
 
-#include <openssl/bn.h>
-#include <openssl/bytestring.h>
-#include <openssl/err.h>
-#include <openssl/ec_key.h>
-#include <openssl/mem.h>
+#include <openssl_grpc/bn.h>
+#include <openssl_grpc/bytestring.h>
+#include <openssl_grpc/err.h>
+#include <openssl_grpc/ec_key.h>
+#include <openssl_grpc/mem.h>
 
 #include "../bytestring/internal.h"
 #include "../fipsmodule/ec/internal.h"
@@ -81,13 +81,11 @@ int ECDSA_sign(int type, const uint8_t *digest, size_t digest_len, uint8_t *sig,
   }
 
   CBB cbb;
-  CBB_zero(&cbb);
+  CBB_init_fixed(&cbb, sig, ECDSA_size(eckey));
   size_t len;
-  if (!CBB_init_fixed(&cbb, sig, ECDSA_size(eckey)) ||
-      !ECDSA_SIG_marshal(&cbb, s) ||
+  if (!ECDSA_SIG_marshal(&cbb, s) ||
       !CBB_finish(&cbb, NULL, &len)) {
     OPENSSL_PUT_ERROR(ECDSA, ECDSA_R_ENCODE_ERROR);
-    CBB_cleanup(&cbb);
     *sig_len = 0;
     goto err;
   }

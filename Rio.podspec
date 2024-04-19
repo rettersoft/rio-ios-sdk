@@ -8,7 +8,7 @@
 
 Pod::Spec.new do |s|
   s.name             = 'Rio'
-  s.version          = '0.0.55'
+  s.version          = '0.0.56'
   s.summary          = 'A short description of Rio.'
 
 # This description is used to generate tags and improve search results.
@@ -50,12 +50,12 @@ TODO: Add long description of the pod here.
   s.static_framework = true
   
   s.dependency 'Moya', '~> 14.0'
-  s.dependency 'Alamofire', '~> 5.2'
+  s.dependency 'Alamofire', '~> 5.9.0'
   s.dependency 'KeychainSwift', '~> 22.0'
   s.dependency 'JWTDecode', '~> 2.4'
-  s.dependency 'Firebase', '~> 10.2.0'
-  s.dependency 'Firebase/Firestore', '~> 10.2.0'
-  s.dependency 'Firebase/Auth', '~> 10.2.0'
+  s.dependency 'Firebase', '~> 10.22.0'
+  s.dependency 'Firebase/Firestore', '~> 10.22.0'
+  s.dependency 'Firebase/Auth', '~> 10.22.0'
 
   
   

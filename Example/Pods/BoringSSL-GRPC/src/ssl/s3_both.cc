@@ -168,7 +168,7 @@ static bool add_record_to_flight(SSL *ssl, uint8_t type,
   return true;
 }
 
-bool ssl3_init_message(SSL *ssl, CBB *cbb, CBB *body, uint8_t type) {
+bool tls_init_message(const SSL *ssl, CBB *cbb, CBB *body, uint8_t type) {
   // Pick a modest size hint to save most of the |realloc| calls.
   if (!CBB_init(cbb, 64) ||
       !CBB_add_u8(cbb, type) ||
@@ -181,11 +181,11 @@ bool ssl3_init_message(SSL *ssl, CBB *cbb, CBB *body, uint8_t type) {
   return true;
 }
 
-bool ssl3_finish_message(SSL *ssl, CBB *cbb, Array<uint8_t> *out_msg) {
+bool tls_finish_message(const SSL *ssl, CBB *cbb, Array<uint8_t> *out_msg) {
   return CBBFinishArray(cbb, out_msg);
 }
 
-bool ssl3_add_message(SSL *ssl, Array<uint8_t> msg) {
+bool tls_add_message(SSL *ssl, Array<uint8_t> msg) {
   // Pack handshake data into the minimal number of records. This avoids
   // unnecessary encryption overhead, notably in TLS 1.3 where we send several
   // encrypted messages in a row. For now, we do not do this for the null
@@ -251,7 +251,8 @@ bool tls_flush_pending_hs_data(SSL *ssl) {
       MakeConstSpan(reinterpret_cast<const uint8_t *>(pending_hs_data->data),
                     pending_hs_data->length);
   if (ssl->quic_method) {
-    if (!ssl->quic_method->add_handshake_data(ssl, ssl->s3->write_level,
+    if ((ssl->s3->hs == nullptr || !ssl->s3->hs->hints_requested) &&
+        !ssl->quic_method->add_handshake_data(ssl, ssl->s3->write_level,
                                               data.data(), data.size())) {
       OPENSSL_PUT_ERROR(SSL, SSL_R_QUIC_INTERNAL_ERROR);
       return false;
@@ -262,7 +263,7 @@ bool tls_flush_pending_hs_data(SSL *ssl) {
   return add_record_to_flight(ssl, SSL3_RT_HANDSHAKE, data);
 }
 
-bool ssl3_add_change_cipher_spec(SSL *ssl) {
+bool tls_add_change_cipher_spec(SSL *ssl) {
   static const uint8_t kChangeCipherSpec[1] = {SSL3_MT_CCS};
 
   if (!tls_flush_pending_hs_data(ssl)) {
@@ -280,7 +281,7 @@ bool ssl3_add_change_cipher_spec(SSL *ssl) {
   return true;
 }
 
-int ssl3_flush_flight(SSL *ssl) {
+int tls_flush_flight(SSL *ssl) {
   if (!tls_flush_pending_hs_data(ssl)) {
     return -1;
   }
@@ -320,6 +321,11 @@ int ssl3_flush_flight(SSL *ssl) {
       ssl->s3->rwstate = SSL_ERROR_WANT_WRITE;
       return ret;
     }
+  }
+
+  if (ssl->wbio == nullptr) {
+    OPENSSL_PUT_ERROR(SSL, SSL_R_BIO_NOT_SET);
+    return -1;
   }
 
   // Write the pending flight.
@@ -433,7 +439,6 @@ static ssl_open_record_t read_v2_client_hello(SSL *ssl, size_t *out_consumed,
       // No session id.
       !CBB_add_u8(&hello_body, 0) ||
       !CBB_add_u16_length_prefixed(&hello_body, &cipher_suites)) {
-    OPENSSL_PUT_ERROR(SSL, ERR_R_MALLOC_FAILURE);
     return ssl_open_record_error;
   }
 
@@ -496,7 +501,7 @@ static bool parse_message(const SSL *ssl, SSLMessage *out,
   return true;
 }
 
-bool ssl3_get_message(const SSL *ssl, SSLMessage *out) {
+bool tls_get_message(const SSL *ssl, SSLMessage *out) {
   size_t unused;
   if (!parse_message(ssl, out, &unused)) {
     return false;
@@ -552,8 +557,8 @@ bool tls_append_handshake_data(SSL *ssl, Span<const uint8_t> data) {
          BUF_MEM_append(ssl->s3->hs_buf.get(), data.data(), data.size());
 }
 
-ssl_open_record_t ssl3_open_handshake(SSL *ssl, size_t *out_consumed,
-                                      uint8_t *out_alert, Span<uint8_t> in) {
+ssl_open_record_t tls_open_handshake(SSL *ssl, size_t *out_consumed,
+                                     uint8_t *out_alert, Span<uint8_t> in) {
   *out_consumed = 0;
   // Bypass the record layer for the first message to handle V2ClientHello.
   if (ssl->server && !ssl->s3->v2_hello_done) {
@@ -631,9 +636,9 @@ ssl_open_record_t ssl3_open_handshake(SSL *ssl, size_t *out_consumed,
   return ssl_open_record_success;
 }
 
-void ssl3_next_message(SSL *ssl) {
+void tls_next_message(SSL *ssl) {
   SSLMessage msg;
-  if (!ssl3_get_message(ssl, &msg) ||
+  if (!tls_get_message(ssl, &msg) ||
       !ssl->s3->hs_buf ||
       ssl->s3->hs_buf->length < CBS_len(&msg.raw)) {
     assert(0);
@@ -658,41 +663,72 @@ void ssl3_next_message(SSL *ssl) {
 // the client.
 class CipherScorer {
  public:
-  CipherScorer(uint16_t group_id)
-      : aes_is_fine_(EVP_has_aes_hardware()),
-        security_128_is_fine_(group_id != SSL_CURVE_CECPQ2) {}
+  CipherScorer(bool has_aes_hw) : aes_is_fine_(has_aes_hw) {}
 
-  typedef std::tuple<bool, bool, bool> Score;
+  typedef std::tuple<bool, bool> Score;
 
   // MinScore returns a |Score| that will compare less than the score of all
   // cipher suites.
   Score MinScore() const {
-    return Score(false, false, false);
+    return Score(false, false);
   }
 
   Score Evaluate(const SSL_CIPHER *a) const {
     return Score(
         // Something is always preferable to nothing.
         true,
-        // Either 128-bit is fine, or 256-bit is preferred.
-        security_128_is_fine_ || a->algorithm_enc != SSL_AES128GCM,
         // Either AES is fine, or else ChaCha20 is preferred.
         aes_is_fine_ || a->algorithm_enc == SSL_CHACHA20POLY1305);
   }
 
  private:
   const bool aes_is_fine_;
-  const bool security_128_is_fine_;
 };
 
-const SSL_CIPHER *ssl_choose_tls13_cipher(CBS cipher_suites, uint16_t version,
-                                          uint16_t group_id) {
+bool ssl_tls13_cipher_meets_policy(uint16_t cipher_id,
+                                   enum ssl_compliance_policy_t policy) {
+  switch (policy) {
+    case ssl_compliance_policy_none:
+      return true;
+
+    case ssl_compliance_policy_fips_202205:
+      switch (cipher_id) {
+        case TLS1_3_CK_AES_128_GCM_SHA256 & 0xffff:
+        case TLS1_3_CK_AES_256_GCM_SHA384 & 0xffff:
+          return true;
+        case TLS1_3_CK_CHACHA20_POLY1305_SHA256 & 0xffff:
+          return false;
+        default:
+          assert(false);
+          return false;
+      }
+
+    case ssl_compliance_policy_wpa3_192_202304:
+      switch (cipher_id) {
+        case TLS1_3_CK_AES_256_GCM_SHA384 & 0xffff:
+          return true;
+        case TLS1_3_CK_AES_128_GCM_SHA256 & 0xffff:
+        case TLS1_3_CK_CHACHA20_POLY1305_SHA256 & 0xffff:
+          return false;
+        default:
+          assert(false);
+          return false;
+      }
+  }
+
+  assert(false);
+  return false;
+}
+
+const SSL_CIPHER *ssl_choose_tls13_cipher(CBS cipher_suites, bool has_aes_hw,
+                                          uint16_t version, uint16_t group_id,
+                                          enum ssl_compliance_policy_t policy) {
   if (CBS_len(&cipher_suites) % 2 != 0) {
     return nullptr;
   }
 
   const SSL_CIPHER *best = nullptr;
-  CipherScorer scorer(group_id);
+  CipherScorer scorer(has_aes_hw);
   CipherScorer::Score best_score = scorer.MinScore();
 
   while (CBS_len(&cipher_suites) > 0) {
@@ -706,6 +742,11 @@ const SSL_CIPHER *ssl_choose_tls13_cipher(CBS cipher_suites, uint16_t version,
     if (candidate == nullptr ||
         SSL_CIPHER_get_min_version(candidate) > version ||
         SSL_CIPHER_get_max_version(candidate) < version) {
+      continue;
+    }
+
+    if (!ssl_tls13_cipher_meets_policy(SSL_CIPHER_get_protocol_id(candidate),
+                                       policy)) {
       continue;
     }
 

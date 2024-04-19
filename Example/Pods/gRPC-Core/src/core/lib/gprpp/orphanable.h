@@ -1,35 +1,31 @@
-/*
- *
- * Copyright 2017 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
+//
+//
+// Copyright 2017 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
-#ifndef GRPC_CORE_LIB_GPRPP_ORPHANABLE_H
-#define GRPC_CORE_LIB_GPRPP_ORPHANABLE_H
+#ifndef GRPC_SRC_CORE_LIB_GPRPP_ORPHANABLE_H
+#define GRPC_SRC_CORE_LIB_GPRPP_ORPHANABLE_H
 
 #include <grpc/support/port_platform.h>
 
-#include <grpc/support/log.h>
-#include <grpc/support/sync.h>
-
 #include <cinttypes>
 #include <memory>
+#include <utility>
 
-#include "src/core/lib/debug/trace.h"
 #include "src/core/lib/gprpp/debug_location.h"
-#include "src/core/lib/gprpp/memory.h"
 #include "src/core/lib/gprpp/ref_counted.h"
 #include "src/core/lib/gprpp/ref_counted_ptr.h"
 
@@ -73,7 +69,7 @@ inline OrphanablePtr<T> MakeOrphanable(Args&&... args) {
 }
 
 // A type of Orphanable with internal ref-counting.
-template <typename Child>
+template <typename Child, typename UnrefBehavior = UnrefDelete>
 class InternallyRefCounted : public Orphanable {
  public:
   // Not copyable nor movable.
@@ -85,33 +81,57 @@ class InternallyRefCounted : public Orphanable {
   template <typename T>
   friend class RefCountedPtr;
 
-  // TraceFlagT is defined to accept both DebugOnlyTraceFlag and TraceFlag.
-  // Note: RefCount tracing is only enabled on debug builds, even when a
-  //       TraceFlag is used.
-  template <typename TraceFlagT = TraceFlag>
-  explicit InternallyRefCounted(TraceFlagT* trace_flag = nullptr,
+  // Note: Tracing is a no-op on non-debug builds.
+  explicit InternallyRefCounted(const char* trace = nullptr,
                                 intptr_t initial_refcount = 1)
-      : refs_(initial_refcount, trace_flag) {}
-  virtual ~InternallyRefCounted() = default;
+      : refs_(initial_refcount, trace) {}
+  ~InternallyRefCounted() override = default;
 
-  RefCountedPtr<Child> Ref() GRPC_MUST_USE_RESULT {
+  GRPC_MUST_USE_RESULT RefCountedPtr<Child> Ref() {
     IncrementRefCount();
     return RefCountedPtr<Child>(static_cast<Child*>(this));
   }
-  RefCountedPtr<Child> Ref(const DebugLocation& location,
-                           const char* reason) GRPC_MUST_USE_RESULT {
+  GRPC_MUST_USE_RESULT RefCountedPtr<Child> Ref(const DebugLocation& location,
+                                                const char* reason) {
     IncrementRefCount(location, reason);
     return RefCountedPtr<Child>(static_cast<Child*>(this));
   }
 
+  template <
+      typename Subclass,
+      std::enable_if_t<std::is_base_of<Child, Subclass>::value, bool> = true>
+  RefCountedPtr<Subclass> RefAsSubclass() {
+    IncrementRefCount();
+    return RefCountedPtr<Subclass>(static_cast<Subclass*>(this));
+  }
+  template <
+      typename Subclass,
+      std::enable_if_t<std::is_base_of<Child, Subclass>::value, bool> = true>
+  RefCountedPtr<Subclass> RefAsSubclass(const DebugLocation& location,
+                                        const char* reason) {
+    IncrementRefCount(location, reason);
+    return RefCountedPtr<Subclass>(static_cast<Subclass*>(this));
+  }
+
+  GRPC_MUST_USE_RESULT RefCountedPtr<Child> RefIfNonZero() {
+    return RefCountedPtr<Child>(refs_.RefIfNonZero() ? static_cast<Child*>(this)
+                                                     : nullptr);
+  }
+  GRPC_MUST_USE_RESULT RefCountedPtr<Child> RefIfNonZero(
+      const DebugLocation& location, const char* reason) {
+    return RefCountedPtr<Child>(refs_.RefIfNonZero(location, reason)
+                                    ? static_cast<Child*>(this)
+                                    : nullptr);
+  }
+
   void Unref() {
     if (GPR_UNLIKELY(refs_.Unref())) {
-      delete this;
+      unref_behavior_(static_cast<Child*>(this));
     }
   }
   void Unref(const DebugLocation& location, const char* reason) {
     if (GPR_UNLIKELY(refs_.Unref(location, reason))) {
-      delete this;
+      unref_behavior_(static_cast<Child*>(this));
     }
   }
 
@@ -121,9 +141,10 @@ class InternallyRefCounted : public Orphanable {
     refs_.Ref(location, reason);
   }
 
-  grpc_core::RefCount refs_;
+  RefCount refs_;
+  GPR_NO_UNIQUE_ADDRESS UnrefBehavior unref_behavior_;
 };
 
 }  // namespace grpc_core
 
-#endif /* GRPC_CORE_LIB_GPRPP_ORPHANABLE_H */
+#endif  // GRPC_SRC_CORE_LIB_GPRPP_ORPHANABLE_H

@@ -1,6 +1,6 @@
 {
   "name": "Rio",
-  "version": "0.0.36",
+  "version": "0.0.56",
   "summary": "A short description of Rio.",
   "description": "TODO: Add long description of the pod here.",
   "homepage": "https://github.com/rettersoft/rio-ios-sdk",
@@ -13,10 +13,10 @@
   },
   "source": {
     "git": "https://github.com/rettersoft/rio-ios-sdk.git",
-    "tag": "0.0.36"
+    "tag": "0.0.56"
   },
   "platforms": {
-    "ios": "11.0"
+    "ios": "12.0"
   },
   "source_files": "Rio/Classes/**/*",
   "resource_bundles": {
@@ -24,34 +24,36 @@
       "**/Assets/*"
     ]
   },
+  "pod_target_xcconfig": {
+    "EXCLUDED_ARCHS[sdk=iphonesimulator*]": "arm64"
+  },
+  "user_target_xcconfig": {
+    "EXCLUDED_ARCHS[sdk=iphonesimulator*]": "arm64"
+  },
+  "swift_versions": "5.0",
   "static_framework": true,
   "dependencies": {
     "Moya": [
       "~> 14.0"
     ],
     "Alamofire": [
-      "~> 5.2"
-    ],
-    "ObjectMapper": [
-      "~> 3.4"
+      "~> 5.9.0"
     ],
     "KeychainSwift": [
-      "~> 19.0"
+      "~> 22.0"
     ],
     "JWTDecode": [
       "~> 2.4"
     ],
-    "TrustKit": [
-
-    ],
     "Firebase": [
-      "~> 8.11.0"
+      "~> 10.22.0"
     ],
     "Firebase/Firestore": [
-      "~> 8.11.0"
+      "~> 10.22.0"
     ],
     "Firebase/Auth": [
-      "~> 8.11.0"
+      "~> 10.22.0"
     ]
-  }
+  },
+  "swift_version": "5.0"
 }
