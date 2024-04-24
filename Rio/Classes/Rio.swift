@@ -475,8 +475,8 @@ public class Rio {
         }
         
         let obj = try? JSONEncoder().encode(tokenData)
-        guard let object = obj, let data = try? JSONSerialization.data(withJSONObject: object, options: .prettyPrinted) else { return }
-        keychain.set(data, forKey: RioKeychainKey.token.keyName) // ??
+        guard let object = obj else { return }
+        keychain.set(object, forKey: RioKeychainKey.token.keyName) // ??
         
         logger.log("saveTokenData 2")
         

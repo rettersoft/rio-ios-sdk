@@ -271,7 +271,7 @@ extension RioService: TargetType, AccessTokenAuthorizable {
         var headers: [String: String] = [:]
         headers["Content-Type"] = "application/json"
         headers["x-rio-sdk-client"] = "iOS"
-        headers["rio-sdk-version"] = "0.0.56"
+        headers["rio-sdk-version"] = "0.0.57"
         headers["installationId"] = String.getInstallationId()
         
         switch self {
