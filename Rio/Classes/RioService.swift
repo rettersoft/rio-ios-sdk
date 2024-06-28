@@ -271,7 +271,7 @@ extension RioService: TargetType, AccessTokenAuthorizable {
         var headers: [String: String] = [:]
         headers["Content-Type"] = "application/json"
         headers["x-rio-sdk-client"] = "iOS"
-        headers["rio-sdk-version"] = "0.0.57"
+        headers["rio-sdk-version"] = "0.0.58"
         headers["installationId"] = String.getInstallationId()
         
         switch self {
@@ -355,5 +355,82 @@ extension String {
             UserDefaults.standard.set(id, forKey: RioUserDefaultsKey.installationId.keyName)
             return id
         }
+    }
+}
+
+class PublicKeysPinningTrustEvaluator: ServerTrustEvaluating {
+    let pinnedPublicKeys: [SecKey]
+
+    init(publicKeys: [SecKey]) {
+        self.pinnedPublicKeys = publicKeys
+    }
+
+    func evaluate(_ trust: SecTrust, forHost host: String) throws {
+        guard SecTrustEvaluateWithError(trust, nil) else {
+            throw AFError.serverTrustEvaluationFailed(reason: .noPublicKeysFound)
+        }
+
+        for index in 0..<SecTrustGetCertificateCount(trust) {
+            if let certificate = SecTrustGetCertificateAtIndex(trust, index),
+               let serverPublicKey = SecCertificateCopyKey(certificate) {
+                for pinnedKey in pinnedPublicKeys {
+                    if serverPublicKey == pinnedKey {
+                        return // Success if any key matches
+                    }
+                }
+            }
+        }
+
+        throw AFError.serverTrustEvaluationFailed(reason: .noPublicKeysFound)
+    }
+}
+
+extension String {
+    func base64DecodedData() -> Data? {
+        let base64String = self
+            .replacingOccurrences(of: "-----BEGIN PUBLIC KEY-----", with: "")
+            .replacingOccurrences(of: "-----END PUBLIC KEY-----", with: "")
+            .replacingOccurrences(of: "\n", with: "")
+        
+        return Data(base64Encoded: base64String)
+    }
+}
+
+class PublicKeyPinningServerTrustManager: ServerTrustManager {
+    private let domainsToPublicKeyStrings: [String: [String]]
+    
+    init(domainsToPublicKeyStrings: [String: [String]]) {
+        self.domainsToPublicKeyStrings = domainsToPublicKeyStrings
+        super.init(evaluators: [:])
+    }
+    
+    override func serverTrustEvaluator(forHost host: String) -> ServerTrustEvaluating? {
+        guard let publicKeyStrings = domainsToPublicKeyStrings[host] else {
+            return nil
+        }
+        return PublicKeysTrustEvaluator(keys: publicKeys(from: publicKeyStrings), performDefaultValidation: true, validateHost: true)
+    }
+    
+    private func publicKeys(from publicKeyStrings: [String]) -> [SecKey] {
+        return publicKeyStrings.compactMap { createSecKey(from: $0) }
+    }
+    
+    func createSecKey(from base64String: String) -> SecKey? {
+        guard let keyData = base64String.base64DecodedData() else { return nil }
+
+        let options: [String: Any] = [
+            kSecAttrKeyType as String: kSecAttrKeyTypeRSA,
+            kSecAttrKeyClass as String: kSecAttrKeyClassPublic,
+            kSecAttrKeySizeInBits as String: 2048
+        ]
+        
+        var error: Unmanaged<CFError>?
+        let secKey = SecKeyCreateWithData(keyData as CFData, options as CFDictionary, &error)
+        
+        if let error = error {
+            print("Error creating public key: \(error.takeRetainedValue())")
+        }
+        
+        return secKey
     }
 }

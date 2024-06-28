@@ -88,6 +88,14 @@ public struct RioFirebaseOptions {
     }
 }
 
+public struct RioSSLConfig {
+    var domainsToPublicKeyStrings: [String: [String]]
+    
+    public init(domainsToPublicKeyStrings: [String: [String]]) {
+        self.domainsToPublicKeyStrings = domainsToPublicKeyStrings
+    }
+}
+
 public struct RioConfig {
     var projectId: String?
     var secretKey: String?
@@ -95,10 +103,25 @@ public struct RioConfig {
     var serviceId: String?
     var region: RioRegion?
     var sslPinningEnabled: Bool?
+    var customSSLConfig: RioSSLConfig?
     var isLoggingEnabled: Bool?
     var culture: String? = defaultCulture
     var retryConfig: RetryConfig?
-    
+
+    /// Custom SSL Pinning: Requires exact domain match. Each domain can have multiple public keys.
+    /*
+     RioSSLConfig(domainsToPublicKeyStrings: ["retter.io": ["""
+                                                             -----BEGIN PUBLIC KEY-----
+                                                             XXX
+                                                             -----END PUBLIC KEY-----
+                                                             """],
+                                              "api.retter.io": ["""
+                                                             -----BEGIN PUBLIC KEY-----
+                                                             YYY
+                                                             -----END PUBLIC KEY-----
+                                                             """]
+    ]
+    */
     public init(
         projectId: String,
         secretKey: String? = nil,
@@ -106,6 +129,7 @@ public struct RioConfig {
         serviceId: String? = nil,
         region: RioRegion? = nil,
         sslPinningEnabled: Bool? = nil,
+        customSSLConfig: RioSSLConfig? = nil,
         isLoggingEnabled: Bool = false,
         culture: String? = nil,
         retryConfig: RetryConfig? = nil
@@ -116,6 +140,7 @@ public struct RioConfig {
         self.serviceId = serviceId
         self.region = region == nil ? .euWest1 : region
         self.sslPinningEnabled = sslPinningEnabled
+        self.customSSLConfig = customSSLConfig
         self.isLoggingEnabled = isLoggingEnabled
         self.culture = culture == nil ? defaultCulture : culture
         self.retryConfig = retryConfig == nil ? RetryConfig() : retryConfig
@@ -320,7 +345,13 @@ public class Rio {
             }
             
             if config.sslPinningEnabled ?? false {
-                if let bundleURL = Bundle(for: type(of: self)).url(forResource: "RioBundle", withExtension: "bundle") {
+                if let customSSLConfig = config.customSSLConfig {
+                    let serverTrustManager = PublicKeyPinningServerTrustManager(domainsToPublicKeyStrings: customSSLConfig.domainsToPublicKeyStrings)
+                    let session = Session(serverTrustManager: serverTrustManager)
+                    
+                    self._service = MoyaProvider<RioService>(session: session, plugins: plugins)
+                    return self._service!
+                } else if let bundleURL = Bundle(for: type(of: self)).url(forResource: "RioBundle", withExtension: "bundle") {
                     if let bundle = Bundle(url: bundleURL) {
                         let certificates: [SecCertificate] = [1, 2, 3, 4, 5].map { element in
                             let path = bundle.path(forResource: "\(element)", ofType: "cer") ?? ""
@@ -330,7 +361,6 @@ public class Rio {
                         
                         let evaluator = PinnedCertificatesTrustEvaluator(certificates: certificates)
                         var session = Session()
-                        
                         
                         var domains: [String: ServerTrustEvaluating] = [
                             "core.rtbs.io": evaluator,
