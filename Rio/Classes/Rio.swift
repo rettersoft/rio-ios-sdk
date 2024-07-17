@@ -416,10 +416,12 @@ public class Rio {
         self.projectId = config.projectId
         globalRioRegion = config.region!
         
+        /*
         if !UserDefaults.standard.bool(forKey: RioUserDefaultsKey.openedFirstTime.keyName) {
             keychain.delete(RioKeychainKey.token.keyName)
             UserDefaults.standard.set(true, forKey: RioUserDefaultsKey.openedFirstTime.keyName)
         }
+         */
     }
     
     public var culture : String {
