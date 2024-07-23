@@ -172,6 +172,7 @@ struct RioLogger {
 public struct RioUser {
     public var uid: String
     public var isAnonymous: Bool
+    public var identity: String? = nil
 }
 
 struct RioTokenResponse: Codable {
@@ -516,9 +517,11 @@ public class Rio {
            let jwt = try? decode(jwt: accessToken) {
             if let userId = jwt.claim(name: "userId").string {
                 if userId != storedUserId {
-                    logger.log("userId \(userId) - stored: \(storedUserId ?? "-")")
+                    let identity = jwt.claim(name: "identity").string
+                    
+                    logger.log("userId \(userId) | stored: \(storedUserId ?? "-") | identity: \(identity ?? "-")")
                     // User has changed.
-                    let user = RioUser(uid: userId, isAnonymous: false)
+                    let user = RioUser(uid: userId, isAnonymous: false, identity: identity)
                     
                     logger.log("initFirebaseApp 1")
                     if let app = self.firebaseApp, let customToken = tokenData.firebase?.customToken {
@@ -550,7 +553,10 @@ public class Rio {
                     configureFirebase(with: tokenData)
                     if let app = self.firebaseApp, let customToken = tokenData.firebase?.customToken {
                         if Auth.auth(app: app).currentUser?.uid == nil {
-                            let user = RioUser(uid: userId, isAnonymous: false)
+                            let identity = jwt.claim(name: "identity").string
+                            logger.log("userId \(userId) | stored: \(storedUserId ?? "-") | identity: \(identity ?? "-")")
+
+                            let user = RioUser(uid: userId, isAnonymous: false, identity: identity)
                             logger.log("initFirebaseApp 2")
                             self.logger.log("FIREBASE custom auth \(userId)")
                             
@@ -646,6 +652,12 @@ public class Rio {
            let gcmSenderID = tokenData.firebase?.envs?.gcmSenderId,
            let firebaseProjectID = tokenData.firebase?.projectId,
            let apiKey = tokenData.firebase?.apiKey {
+            
+            // Prevent Firebase initialization for legacy Rio projects with the same bundle identifier (i.e., on the same app) if a user is already logged in
+            if tokenData.projectId != projectId {
+                signOut(isSDK: true)
+                return
+            }
             
             if FirebaseApp.app(name: "rio") == nil {
                 let options = getFirebaseOptions(
@@ -1167,7 +1179,8 @@ public class Rio {
             return .signedOut
         }
         
-        let user = RioUser(uid: userId, isAnonymous: false)
+        let identity = jwt.claim(name: "identity").string
+        let user = RioUser(uid: userId, isAnonymous: false, identity: identity)
         
         if isForStatusChangeDelegation {
             configureFirebase(with: tokenData)
