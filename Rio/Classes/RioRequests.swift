@@ -16,6 +16,7 @@ class RefreshTokenRequest: Codable {
     var projectId: String?
     var refreshToken: String?
     var userId: String?
+    var accessToken: String?
 }
 
 class AuthWithCustomTokenRequest: Codable {

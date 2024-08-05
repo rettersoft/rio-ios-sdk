@@ -589,6 +589,7 @@ public class Rio {
         refreshTokenRequest.refreshToken = tokenData.refreshToken
         refreshTokenRequest.projectId = projectId
         refreshTokenRequest.userId = tokenData.userId
+        refreshTokenRequest.accessToken = tokenData.accessToken
         
         var retVal: RioTokenData? = nil
         var errorResponse: BaseErrorResponse?
