@@ -107,6 +107,7 @@ public struct RioConfig {
     var isLoggingEnabled: Bool?
     var culture: String? = defaultCulture
     var retryConfig: RetryConfig?
+    var needsTokenDeletion: Bool?
 
     /// Custom SSL Pinning: Requires exact domain match. Each domain can have multiple public keys.
     /*
@@ -132,7 +133,8 @@ public struct RioConfig {
         customSSLConfig: RioSSLConfig? = nil,
         isLoggingEnabled: Bool = false,
         culture: String? = nil,
-        retryConfig: RetryConfig? = nil
+        retryConfig: RetryConfig? = nil,
+        needsTokenDeletion: Bool? = nil
     ) {
         self.projectId = projectId
         self.secretKey = secretKey
@@ -144,6 +146,7 @@ public struct RioConfig {
         self.isLoggingEnabled = isLoggingEnabled
         self.culture = culture == nil ? defaultCulture : culture
         self.retryConfig = retryConfig == nil ? RetryConfig() : retryConfig
+        self.needsTokenDeletion = needsTokenDeletion
     }
 }
 
@@ -417,12 +420,13 @@ public class Rio {
         self.projectId = config.projectId
         globalRioRegion = config.region!
         
-        /*
-        if !UserDefaults.standard.bool(forKey: RioUserDefaultsKey.openedFirstTime.keyName) {
-            keychain.delete(RioKeychainKey.token.keyName)
-            UserDefaults.standard.set(true, forKey: RioUserDefaultsKey.openedFirstTime.keyName)
+        // to delete token after user deletes the app, this value must be true
+        if config.needsTokenDeletion ?? true {
+            if !UserDefaults.standard.bool(forKey: RioUserDefaultsKey.openedFirstTime.keyName) {
+                keychain.delete(RioKeychainKey.token.keyName)
+                UserDefaults.standard.set(true, forKey: RioUserDefaultsKey.openedFirstTime.keyName)
+            }
         }
-         */
     }
     
     public var culture : String {
