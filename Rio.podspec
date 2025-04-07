@@ -19,7 +19,7 @@ Rio is an SDK that simplifies integrating Retter’s Rio platform into your iOS 
   s.author           = { 'Baran Baygan' => 'baran@rettermobile.com' }
   s.source           = { :git => 'https://github.com/rettersoft/rio-ios-sdk.git', :tag => s.version.to_s }
 
-  s.ios.deployment_target = '12.0'
+  s.ios.deployment_target = '13.0'
 
   s.source_files = 'Rio/Classes/**/*'
   
