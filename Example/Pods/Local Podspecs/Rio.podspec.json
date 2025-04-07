@@ -1,8 +1,8 @@
 {
   "name": "Rio",
-  "version": "0.0.56",
-  "summary": "A short description of Rio.",
-  "description": "TODO: Add long description of the pod here.",
+  "version": "0.0.63",
+  "summary": "An iOS SDK for seamless integration with Retter’s Rio backend.",
+  "description": "Rio is an SDK that simplifies integrating Retter’s Rio platform into your iOS app.",
   "homepage": "https://github.com/rettersoft/rio-ios-sdk",
   "license": {
     "type": "MIT",
@@ -13,7 +13,7 @@
   },
   "source": {
     "git": "https://github.com/rettersoft/rio-ios-sdk.git",
-    "tag": "0.0.56"
+    "tag": "0.0.63"
   },
   "platforms": {
     "ios": "12.0"
@@ -46,13 +46,13 @@
       "~> 2.4"
     ],
     "Firebase": [
-      "~> 10.22.0"
+      "~> 11.11.0"
     ],
     "Firebase/Firestore": [
-      "~> 10.22.0"
+      "~> 11.11.0"
     ],
     "Firebase/Auth": [
-      "~> 10.22.0"
+      "~> 11.11.0"
     ]
   },
   "swift_version": "5.0"

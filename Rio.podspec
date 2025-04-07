@@ -8,25 +8,16 @@
 
 Pod::Spec.new do |s|
   s.name             = 'Rio'
-  s.version          = '0.0.62'
-  s.summary          = 'A short description of Rio.'
-
-# This description is used to generate tags and improve search results.
-#   * Think: What does it do? Why did you write it? What is the focus?
-#   * Try to keep it short, snappy and to the point.
-#   * Write the description between the DESC delimiters below.
-#   * Finally, don't worry about the indent, CocoaPods strips it!
-
+  s.version          = '0.0.63'
+  s.summary          = 'An iOS SDK for seamless integration with Retter’s Rio backend.'
   s.description      = <<-DESC
-TODO: Add long description of the pod here.
+Rio is an SDK that simplifies integrating Retter’s Rio platform into your iOS app.
                        DESC
 
   s.homepage         = 'https://github.com/rettersoft/rio-ios-sdk'
-  # s.screenshots     = 'www.example.com/screenshots_1', 'www.example.com/screenshots_2'
   s.license          = { :type => 'MIT', :file => 'LICENSE' }
   s.author           = { 'Baran Baygan' => 'baran@rettermobile.com' }
   s.source           = { :git => 'https://github.com/rettersoft/rio-ios-sdk.git', :tag => s.version.to_s }
-  # s.social_media_url = 'https://twitter.com/<TWITTER_USERNAME>'
 
   s.ios.deployment_target = '12.0'
 
@@ -42,10 +33,6 @@ TODO: Add long description of the pod here.
   s.user_target_xcconfig = { 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'arm64' }
 
   s.swift_version = '5.0'
-
-  # s.public_header_files = 'Pod/Classes/**/*.h'
-  # s.frameworks = 'UIKit', 'MapKit'
-  # s.dependency 'AFNetworking', '~> 2.3'
   
   s.static_framework = true
   
@@ -53,10 +40,8 @@ TODO: Add long description of the pod here.
   s.dependency 'Alamofire', '~> 5.9.0'
   s.dependency 'KeychainSwift', '~> 22.0'
   s.dependency 'JWTDecode', '~> 2.4'
-  s.dependency 'Firebase', '~> 10.22.0'
-  s.dependency 'Firebase/Firestore', '~> 10.22.0'
-  s.dependency 'Firebase/Auth', '~> 10.22.0'
+  s.dependency 'Firebase', '~> 11.11.0'
+  s.dependency 'Firebase/Firestore', '~> 11.11.0'
+  s.dependency 'Firebase/Auth', '~> 11.11.0'
 
-  
-  
 end
