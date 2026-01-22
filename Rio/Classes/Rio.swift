@@ -193,33 +193,21 @@ struct RioTokenData: Codable {
     var deltaTime: Double?
     
     var accessTokenExpiresAt: Date? {
-        get {
-            guard let accessToken = self.accessToken else { return nil }
-            
-            let jwt = try! decode(jwt: accessToken)
-            return jwt.expiresAt
-        }
+        guard let accessToken = self.accessToken,
+              let jwt = try? decode(jwt: accessToken) else { return nil }
+        return jwt.expiresAt
     }
     
     var refreshTokenExpiresAt: Date? {
-        get {
-            guard let token = self.refreshToken else { return nil }
-            
-            let jwt = try! decode(jwt: token)
-            return jwt.expiresAt
-        }
+        guard let token = self.refreshToken,
+              let jwt = try? decode(jwt: token) else { return nil }
+        return jwt.expiresAt
     }
     
     var userId: String? {
-        if let token = accessToken {
-            let jwt = try! decode(jwt: token)
-            guard let id = jwt.claim(name: "userId").string else {
-                return nil
-            }
-            
-            return id
-        }
-        return nil
+        guard let token = accessToken,
+              let jwt = try? decode(jwt: token) else { return nil }
+        return jwt.claim(name: "userId").string
     }
 }
 
@@ -327,80 +315,96 @@ public class Rio {
         }
     }
     
+    private var serviceLock = NSLock()
     private var _service: MoyaProvider<RioService>?
-    private var service : MoyaProvider<RioService> {
-        get {
-            if self._service != nil {
-                return self._service!
-            }
-            
-            let accessTokenPlugin = AccessTokenPlugin { _ -> String in
-                if let data = self.keychain.getData(RioKeychainKey.token.keyName),
-                   let json = try? JSONSerialization.jsonObject(with: data, options: []) {
-                    if let tokenData = try? JSONDecoder().decode(RioTokenData.self, from: data), let accessToken = tokenData.accessToken {
-                        return accessToken
-                    }
-                }
+    
+    private var service: MoyaProvider<RioService> {
+        serviceLock.lock()
+        defer { serviceLock.unlock() }
+        
+        if let existingService = _service {
+            return existingService
+        }
+        
+        let newService = createService()
+        _service = newService
+        return newService
+    }
+    
+    private func createService() -> MoyaProvider<RioService> {
+        let accessTokenPlugin = AccessTokenPlugin { [weak self] _ -> String in
+            guard let self = self,
+                  let data = self.keychain.getData(RioKeychainKey.token.keyName),
+                  let tokenData = try? JSONDecoder().decode(RioTokenData.self, from: data),
+                  let accessToken = tokenData.accessToken else {
                 return ""
             }
-            var plugins: [PluginType] = [CachePolicyPlugin(), accessTokenPlugin]
-            if config.isLoggingEnabled ?? false {
-                plugins.append(NetworkLoggerPlugin())
-            }
-            
-            if config.sslPinningEnabled ?? false {
-                if let customSSLConfig = config.customSSLConfig {
-                    let serverTrustManager = PublicKeyPinningServerTrustManager(domainsToPublicKeyStrings: customSSLConfig.domainsToPublicKeyStrings)
-                    let session = Session(serverTrustManager: serverTrustManager)
-                    
-                    self._service = MoyaProvider<RioService>(session: session, plugins: plugins)
-                    return self._service!
-                } else if let bundleURL = Bundle(for: type(of: self)).url(forResource: "RioBundle", withExtension: "bundle") {
-                    if let bundle = Bundle(url: bundleURL) {
-                        let certificates: [SecCertificate] = [1, 2, 3, 4, 5].map { element in
-                            let path = bundle.path(forResource: "\(element)", ofType: "cer") ?? ""
-                            let certificateData = try? Data(contentsOf: URL(fileURLWithPath: path)) as CFData
-                            return SecCertificateCreateWithData(nil, certificateData!)!
-                        }
-                        
-                        let evaluator = PinnedCertificatesTrustEvaluator(certificates: certificates)
-                        var session = Session()
-                        
-                        var domains: [String: ServerTrustEvaluating] = [
-                            "core.rtbs.io": evaluator,
-                            "core-test.rettermobile.com": evaluator,
-                            "core-test.rtbs.io": evaluator,
-                            "core-internal.rtbs.io": evaluator,
-                            "core-internal-beta.rtbs.io": evaluator,
-                            "api.retter.io": evaluator,
-                            "test-api.retter.io": evaluator,
-                            "root.api.retter.io": evaluator,
-                            "\(projectId!).api.retter.io": evaluator
-                        ]
-                        
-                        if let region = self.config.region {
-                            domains[region.apiURL] = evaluator
-                        }
-                        
-                        let serverTrustManager = ServerTrustManager(evaluators: domains)
-                        session = Session(serverTrustManager: serverTrustManager)
-                        
-                        self._service = MoyaProvider<RioService>(session: session, plugins: plugins)
-                        return self._service!
-                    } else {
-                        logger.log("WARNING! An error occurred while pinning SSL.")
-                    }
-                } else {
-                    logger.log("WARNING! An error occurred while pinning SSL.")
-                }
-            } else {
-                logger.log("WARNING! Rio SSL Pinning disabled.")
-            }
-            
-            self._service = MoyaProvider<RioService>(plugins: plugins)
-            return self._service!
+            return accessToken
         }
+        
+        var plugins: [PluginType] = [CachePolicyPlugin(), accessTokenPlugin]
+        if config.isLoggingEnabled ?? false {
+            plugins.append(NetworkLoggerPlugin())
+        }
+        
+        guard config.sslPinningEnabled ?? false else {
+            logger.log("WARNING! Rio SSL Pinning disabled.")
+            return MoyaProvider<RioService>(plugins: plugins)
+        }
+        
+        // Custom SSL config
+        if let customSSLConfig = config.customSSLConfig {
+            let serverTrustManager = PublicKeyPinningServerTrustManager(
+                domainsToPublicKeyStrings: customSSLConfig.domainsToPublicKeyStrings
+            )
+            let session = Session(serverTrustManager: serverTrustManager)
+            return MoyaProvider<RioService>(session: session, plugins: plugins)
+        }
+        
+        // Bundle certificates
+        guard let bundleURL = Bundle(for: type(of: self)).url(forResource: "RioBundle", withExtension: "bundle"),
+              let bundle = Bundle(url: bundleURL) else {
+            logger.log("WARNING! An error occurred while pinning SSL - bundle not found.")
+            return MoyaProvider<RioService>(plugins: plugins)
+        }
+        
+        let certificates: [SecCertificate] = [1, 2, 3, 4, 5].compactMap { element in
+            guard let path = bundle.path(forResource: "\(element)", ofType: "cer"),
+                  let certificateData = try? Data(contentsOf: URL(fileURLWithPath: path)),
+                  let certificate = SecCertificateCreateWithData(nil, certificateData as CFData) else {
+                logger.log("WARNING! Failed to load certificate \(element).cer")
+                return nil
+            }
+            return certificate
+        }
+        
+        guard !certificates.isEmpty else {
+            logger.log("WARNING! No valid certificates found for SSL pinning.")
+            return MoyaProvider<RioService>(plugins: plugins)
+        }
+        
+        let evaluator = PinnedCertificatesTrustEvaluator(certificates: certificates)
+        var domains: [String: ServerTrustEvaluating] = [
+            "core.rtbs.io": evaluator,
+            "core-test.rettermobile.com": evaluator,
+            "core-test.rtbs.io": evaluator,
+            "core-internal.rtbs.io": evaluator,
+            "core-internal-beta.rtbs.io": evaluator,
+            "api.retter.io": evaluator,
+            "test-api.retter.io": evaluator,
+            "root.api.retter.io": evaluator,
+            "\(projectId ?? "").api.retter.io": evaluator
+        ]
+        
+        if let region = config.region {
+            domains[region.apiURL] = evaluator
+        }
+        
+        let serverTrustManager = ServerTrustManager(evaluators: domains)
+        let session = Session(serverTrustManager: serverTrustManager)
+        return MoyaProvider<RioService>(session: session, plugins: plugins)
     }
+
     
     private let keychain = KeychainSwift()
     
@@ -436,51 +440,57 @@ public class Rio {
     }
     
     private var safeNow: Date {
-        get {
-            let r = Date(timeIntervalSinceNow: 30 + deltaTime)
-            logger.log("Safenow is \(r) with delta \(deltaTime)")
-            return r
+        let r = Date(timeIntervalSinceNow: 30 + deltaTime)
+        logger.log("Safenow is \(r) with delta \(deltaTime)")
+        return r
+    }
+    
+    /// Extracts userId and identity from stored token data
+    /// - Returns: Tuple of (userId, identity) or nil if not available
+    private func extractUserInfo() -> (userId: String, identity: String?)? {
+        guard let data = keychain.getData(RioKeychainKey.token.keyName),
+              let tokenData = try? JSONDecoder().decode(RioTokenData.self, from: data),
+              let accessToken = tokenData.accessToken,
+              let jwt = try? decode(jwt: accessToken),
+              let userId = jwt.claim(name: "userId").string else {
+            return nil
         }
+        return (userId, jwt.claim(name: "identity").string)
     }
     
     // MARK: - Private methods
     private func getTokenData() throws -> RioTokenData? {
         logger.log("getTokenData called")
         
-        if let data = self.keychain.getData(RioKeychainKey.token.keyName) {
-            
-            let json = try! JSONSerialization.jsonObject(with: data, options: [])
-            
-            if let tokenData = try? JSONDecoder().decode(RioTokenData.self, from: data),
+        if let data = self.keychain.getData(RioKeychainKey.token.keyName),
+           let tokenData = try? JSONDecoder().decode(RioTokenData.self, from: data),
                let refreshTokenExpiresAt = tokenData.refreshTokenExpiresAt,
                let accessTokenExpiresAt = tokenData.accessTokenExpiresAt,
-               let projectId = tokenData.projectId {
+           let projectId = tokenData.projectId {
+            
+            configureFirebase(with: tokenData)
+            
+            deltaTime = tokenData.deltaTime ?? 0
+            
+            let now = self.safeNow
+            
+            if projectId == self.projectId {
+                logger.log("refreshTokenExpiresAt \(refreshTokenExpiresAt)")
+                logger.log("accessTokenExpiresAt \(accessTokenExpiresAt)")
+                if refreshTokenExpiresAt > now && accessTokenExpiresAt > now {
+                    // Token can be used
+                    logger.log("returning tokenData")
+                    return tokenData
+                }
                 
-                configureFirebase(with: tokenData)
-                
-                deltaTime = tokenData.deltaTime ?? 0
-                
-                let now = self.safeNow
-                
-                if projectId == self.projectId {
-                    logger.log("refreshTokenExpiresAt \(refreshTokenExpiresAt)")
-                    logger.log("accessTokenExpiresAt \(accessTokenExpiresAt)")
-                    if refreshTokenExpiresAt > now && accessTokenExpiresAt > now {
-                        // Token can be used
-                        logger.log("returning tokenData")
-                        return tokenData
-                    }
+                if refreshTokenExpiresAt > now && accessTokenExpiresAt < now {
+                    logger.log("refreshing token")
+                    // DO REFRESH
                     
-                    if refreshTokenExpiresAt > now && accessTokenExpiresAt < now {
-                        logger.log("refreshing token")
-                        // DO REFRESH
-                        
-                        return try self.refreshToken(tokenData: tokenData)
-                    }
+                    return try self.refreshToken(tokenData: tokenData)
                 }
             }
         }
-        
         return nil
     }
     
@@ -489,13 +499,11 @@ public class Rio {
         var storedUserId: String? = nil
         // First get last stored token data from keychain.
         if let data = self.keychain.getData(RioKeychainKey.token.keyName),
-           let json = try? JSONSerialization.jsonObject(with: data, options: []) {
-            if let storedTokenData = try? JSONDecoder().decode(RioTokenData.self, from: data), let accessToken = storedTokenData.accessToken {
-                let jwt = try! decode(jwt: accessToken)
-                if let userId = jwt.claim(name: "userId").string {
-                    storedUserId = userId
-                }
-            }
+           let storedTokenData = try? JSONDecoder().decode(RioTokenData.self, from: data),
+           let accessToken = storedTokenData.accessToken,
+           let jwt = try? decode(jwt: accessToken),
+           let userId = jwt.claim(name: "userId").string {
+            storedUserId = userId
         }
         
         var tokenDataWithDeltaTime = tokenData
@@ -786,8 +794,9 @@ public class Rio {
             let req = AuthWithCustomTokenRequest()
             req.customToken = customToken
             
-            let jwt = try! decode(jwt: customToken)
-            guard let id = jwt.claim(name: "userId").string else {
+            guard let jwt = try? decode(jwt: customToken),
+                  let id = jwt.claim(name: "userId").string else {
+                authSuccess?(false, .TokenError)
                 return
             }
             
@@ -1068,31 +1077,18 @@ public class Rio {
         let parameters: [String: Any] = options2.body?.compactMapValues( { $0 }) ?? [:]
         let headers = options2.headers?.compactMapValues( { $0 } ) ?? [:]
         
-        if (options2.useLocal ?? false) &&
-            options2.instanceID != nil &&
-            options2.classID != nil {
+        if (options2.useLocal ?? false),
+           let instanceID = options2.instanceID,
+           options2.classID != nil {
             
-            var userIdentity = ""
-            var userId = ""
-            if let data = self.keychain.getData(RioKeychainKey.token.keyName),
-               let json = try? JSONSerialization.jsonObject(with: data, options: []) {
-                if let storedTokenData = try? JSONDecoder().decode(RioTokenData.self, from: data), let accessToken = storedTokenData.accessToken {
-                    let jwt = try! decode(jwt: accessToken)
-                    if let id = jwt.claim(name: "userId").string {
-                        userId = id
-                    }
-                    if let identity = jwt.claim(name: "identity").string {
-                        userIdentity = identity
-                    }
-                }
-            }
+            let userInfo = extractUserInfo()
             
             onSuccess(RioCloudObject(
                 projectID: self.projectId,
                 classID: classId,
-                instanceID: options2.instanceID!,
-                userID: userId,
-                userIdentity: userIdentity,
+                instanceID: instanceID,
+                userID: userInfo?.userId ?? "",
+                userIdentity: userInfo?.identity ?? "",
                 rio: self,
                 isLocal: true
             ))
@@ -1123,27 +1119,13 @@ public class Rio {
             }
             
             if let respInstanceId = cloudResponse.instanceId {
-                
-                var userIdentity: String?
-                var userId: String?
-                if let data = self.keychain.getData(RioKeychainKey.token.keyName) {
-                    let json = try! JSONSerialization.jsonObject(with: data, options: [])
-                    if let storedTokenData = try? JSONDecoder().decode(RioTokenData.self, from: data), let accessToken = storedTokenData.accessToken {
-                        let jwt = try! decode(jwt: accessToken)
-                        if let id = jwt.claim(name: "userId").string {
-                            userId = id
-                        }
-                        if let identity = jwt.claim(name: "identity").string {
-                            userIdentity = identity
-                        }
-                    }
-                }
+                let userInfo = self.extractUserInfo()
                 let object = RioCloudObject(
                     projectID: self.projectId,
                     classID: classId,
                     instanceID: respInstanceId,
-                    userID: userId ?? "",
-                    userIdentity: userIdentity ?? "",
+                    userID: userInfo?.userId ?? "",
+                    userIdentity: userInfo?.identity ?? "",
                     rio: self,
                     response: objectData,
                     methods: cloudResponse.methods,
@@ -1411,16 +1393,16 @@ public class RioCloudObjectState {
         
         var userId = userID
         var identity = userIdentity
-        if userId.isEmpty, identity.isEmpty, let data = KeychainSwift().getData(RioKeychainKey.token.keyName),
-           let json = try? JSONSerialization.jsonObject(with: data, options: []) {
-            if let storedTokenData = try? JSONDecoder().decode(RioTokenData.self, from: data), let accessToken = storedTokenData.accessToken {
-                let jwt = try! decode(jwt: accessToken)
-                if let id = jwt.claim(name: "userId").string {
-                    userId = id
-                }
-                if let theIdentity = jwt.claim(name: "identity").string {
-                    identity = theIdentity
-                }
+        if userId.isEmpty, identity.isEmpty,
+           let data = KeychainSwift().getData(RioKeychainKey.token.keyName),
+           let storedTokenData = try? JSONDecoder().decode(RioTokenData.self, from: data),
+           let accessToken = storedTokenData.accessToken,
+           let jwt = try? decode(jwt: accessToken) {
+            if let id = jwt.claim(name: "userId").string {
+                userId = id
+            }
+            if let theIdentity = jwt.claim(name: "identity").string {
+                identity = theIdentity
             }
         }
         

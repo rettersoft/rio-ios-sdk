@@ -32,15 +32,15 @@ enum RioService {
             let isExcludedAction = cloudObjectActions.contains(request.actionName ?? "")
             
             if !isExcludedAction {
-                return "/user/action/\(request.projectId!)/\(request.actionName!)"
+                return "/user/action/\(request.projectId ?? "")/\(request.actionName ?? "")"
             } else {
                 if request.actionName == "rio.core.request.LIST" {
-                    return "/\(request.projectId!)/LIST/\(request.classID ?? "")"
+                    return "/\(request.projectId ?? "")/LIST/\(request.classID ?? "")"
                 }
 
                 if request.actionName == "rbs.core.request.CALL" {
                     if request.isStaticMethod ?? false {
-                        var thePath = "/\(request.projectId!)/CALL/\(request.classID ?? "")/\(request.method ?? "")"
+                        var thePath = "/\(request.projectId ?? "")/CALL/\(request.classID ?? "")/\(request.method ?? "")"
                         if let endPath = request.path {
                             if endPath.first != "/" {
                                 thePath.append("/")
@@ -49,7 +49,7 @@ enum RioService {
                         }
                         return thePath
                     } else {
-                        var thePath = "/\(request.projectId!)/CALL/\(request.classID ?? "")/\(request.method ?? "")/\(request.instanceID ?? "")"
+                        var thePath = "/\(request.projectId ?? "")/CALL/\(request.classID ?? "")/\(request.method ?? "")/\(request.instanceID ?? "")"
                         if let endPath = request.path {
                             if endPath.first != "/" {
                                 thePath.append("/")
@@ -61,11 +61,11 @@ enum RioService {
                 }
         
                 if let instanceID = request.instanceID {
-                    return "/\(request.projectId!)/INSTANCE/\(request.classID ?? "")/\(instanceID)"
+                    return "/\(request.projectId ?? "")/INSTANCE/\(request.classID ?? "")/\(instanceID)"
                 } else if let keyValue = request.keyValue {
-                    return "/\(request.projectId!)/INSTANCE/\(request.classID ?? "")/\(keyValue.key)!\(keyValue.value)"
+                    return "/\(request.projectId ?? "")/INSTANCE/\(request.classID ?? "")/\(keyValue.key)!\(keyValue.value)"
                 } else {
-                    return "/\(request.projectId!)/INSTANCE/\(request.classID ?? "")"
+                    return "/\(request.projectId ?? "")/INSTANCE/\(request.classID ?? "")"
                 }
                 
             }
@@ -231,23 +231,23 @@ extension RioService: TargetType, AccessTokenAuthorizable {
             
             if !isExcludedAction {
                 if(self.isGetAction(request.actionName)) {
-                    return URL(string: globalRioRegion.getUrl)!
+                    return URL(string: globalRioRegion.getUrl) ?? URL(string: "https://api.retter.io")!
                 }
-                return URL(string: globalRioRegion.postUrl)!
+                return URL(string: globalRioRegion.postUrl) ?? URL(string: "https://api.retter.io")!
             } else {
                 switch globalRioRegion {
                 case .euWest1, .euWest1Beta:
-                    return URL(string: "https://\(request.projectId!).\(globalRioRegion.apiURL)")!
+                    return URL(string: "https://\(request.projectId ?? "").\(globalRioRegion.apiURL)") ?? URL(string: "https://api.retter.io")!
                 case .customRegionWith(_, _):
-                    return URL(string: "https://\(globalRioRegion.apiURL)")!
+                    return URL(string: "https://\(globalRioRegion.apiURL)") ?? URL(string: "https://api.retter.io")!
                 }
             }
         default:
             switch globalRioRegion {
             case .euWest1, .euWest1Beta:
-                return URL(string: "https://root.\(globalRioRegion.apiURL)")!
+                return URL(string: "https://root.\(globalRioRegion.apiURL)") ?? URL(string: "https://api.retter.io")!
             case .customRegionWith(_, _):
-                return URL(string: "https://\(globalRioRegion.apiURL)")!
+                return URL(string: "https://\(globalRioRegion.apiURL)") ?? URL(string: "https://api.retter.io")!
             }
         }
     }
@@ -291,7 +291,7 @@ extension RioService: TargetType, AccessTokenAuthorizable {
         var headers: [String: String] = [:]
         headers["Content-Type"] = "application/json"
         headers["x-rio-sdk-client"] = "iOS"
-        headers["rio-sdk-version"] = "0.0.64"
+        headers["rio-sdk-version"] = "0.0.65"
         headers["installationId"] = String.getInstallationId()
         
         switch self {
