@@ -1,6 +1,7 @@
 use_frameworks!
+source 'https://github.com/CocoaPods/Specs.git'
 
-platform :ios, '12.0'
+platform :ios, '13.0'
 
 target 'Rio_Example' do
   pod 'Rio', :path => '../'
