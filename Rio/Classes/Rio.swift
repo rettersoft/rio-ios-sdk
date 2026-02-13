@@ -89,10 +89,26 @@ public struct RioFirebaseOptions {
 }
 
 public struct RioSSLConfig {
-    var domainsToPublicKeyStrings: [String: [String]]
+    var domainsToPublicKeyStrings: [String: [String]]?
+    var domainsToCertificateData: [String: [Data]]?
     
+    /// Public key pinning only (backward compatible)
     public init(domainsToPublicKeyStrings: [String: [String]]) {
         self.domainsToPublicKeyStrings = domainsToPublicKeyStrings
+        self.domainsToCertificateData = nil
+    }
+    
+    /// Certificate pinning only
+    public init(domainsToCertificateData: [String: [Data]]) {
+        self.domainsToPublicKeyStrings = nil
+        self.domainsToCertificateData = domainsToCertificateData
+    }
+    
+    /// Hybrid: both public key and certificate pinning
+    public init(domainsToPublicKeyStrings: [String: [String]]? = nil,
+                domainsToCertificateData: [String: [Data]]? = nil) {
+        self.domainsToPublicKeyStrings = domainsToPublicKeyStrings
+        self.domainsToCertificateData = domainsToCertificateData
     }
 }
 
@@ -109,8 +125,9 @@ public struct RioConfig {
     var retryConfig: RetryConfig?
     var needsTokenDeletion: Bool?
 
-    /// Custom SSL Pinning: Requires exact domain match. Each domain can have multiple public keys.
+    /// Custom SSL Pinning: Requires exact domain match. Each domain can have multiple public keys and/or certificates.
     /*
+     // Public key pinning:
      RioSSLConfig(domainsToPublicKeyStrings: ["retter.io": ["""
                                                              -----BEGIN PUBLIC KEY-----
                                                              XXX
@@ -122,6 +139,10 @@ public struct RioConfig {
                                                              -----END PUBLIC KEY-----
                                                              """]
     ]
+     
+     // Certificate pinning:
+     let certData = try! Data(contentsOf: Bundle.main.url(forResource: "cert", withExtension: "cer")!)
+     RioSSLConfig(domainsToCertificateData: ["api.retter.io": [certData]])
     */
     public init(
         projectId: String,
@@ -354,8 +375,9 @@ public class Rio {
         
         // Custom SSL config
         if let customSSLConfig = config.customSSLConfig {
-            let serverTrustManager = PublicKeyPinningServerTrustManager(
-                domainsToPublicKeyStrings: customSSLConfig.domainsToPublicKeyStrings
+            let serverTrustManager = HybridPinningServerTrustManager(
+                domainsToPublicKeyStrings: customSSLConfig.domainsToPublicKeyStrings ?? [:],
+                domainsToCertificateData: customSSLConfig.domainsToCertificateData ?? [:]
             )
             let session = Session(serverTrustManager: serverTrustManager)
             return MoyaProvider<RioService>(session: session, plugins: plugins)

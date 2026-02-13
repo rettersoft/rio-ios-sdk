@@ -291,7 +291,7 @@ extension RioService: TargetType, AccessTokenAuthorizable {
         var headers: [String: String] = [:]
         headers["Content-Type"] = "application/json"
         headers["x-rio-sdk-client"] = "iOS"
-        headers["rio-sdk-version"] = "0.0.65"
+        headers["rio-sdk-version"] = "0.0.66"
         headers["installationId"] = String.getInstallationId()
         
         switch self {
@@ -460,5 +460,100 @@ class PublicKeyPinningServerTrustManager: ServerTrustManager {
         }
         
         return secKey
+    }
+}
+
+// MARK: - Hybrid SSL Pinning (Certificate + Public Key)
+
+class HybridPinningServerTrustManager: ServerTrustManager {
+    private let domainsToPublicKeyStrings: [String: [String]]
+    private let domainsToCertificateData: [String: [Data]]
+    
+    init(domainsToPublicKeyStrings: [String: [String]],
+         domainsToCertificateData: [String: [Data]]) {
+        self.domainsToPublicKeyStrings = domainsToPublicKeyStrings
+        self.domainsToCertificateData = domainsToCertificateData
+        super.init(evaluators: [:])
+    }
+    
+    override func serverTrustEvaluator(forHost host: String) -> ServerTrustEvaluating? {
+        let publicKeyStrings = domainsToPublicKeyStrings[host]
+        let certificateDataArray = domainsToCertificateData[host]
+        
+        let hasPublicKeys = publicKeyStrings != nil && !(publicKeyStrings!.isEmpty)
+        let hasCertificates = certificateDataArray != nil && !(certificateDataArray!.isEmpty)
+        
+        // No pinning config for this domain
+        guard hasPublicKeys || hasCertificates else { return nil }
+        
+        // Both: use composite evaluator (either one matching is sufficient)
+        if hasPublicKeys && hasCertificates {
+            var evaluators: [ServerTrustEvaluating] = []
+            
+            let keys = publicKeyStrings!.compactMap { createSecKey(from: $0) }
+            if !keys.isEmpty {
+                evaluators.append(PublicKeysTrustEvaluator(keys: keys, performDefaultValidation: true, validateHost: true))
+            }
+            
+            let certificates = certificateDataArray!.compactMap { SecCertificateCreateWithData(nil, $0 as CFData) }
+            if !certificates.isEmpty {
+                evaluators.append(PinnedCertificatesTrustEvaluator(certificates: certificates))
+            }
+            
+            return evaluators.count > 1 ? CompositeTrustEvaluator(evaluators: evaluators) : evaluators.first
+        }
+        
+        // Public key only
+        if hasPublicKeys {
+            let keys = publicKeyStrings!.compactMap { createSecKey(from: $0) }
+            return PublicKeysTrustEvaluator(keys: keys, performDefaultValidation: true, validateHost: true)
+        }
+        
+        // Certificate only
+        let certificates = certificateDataArray!.compactMap { SecCertificateCreateWithData(nil, $0 as CFData) }
+        return PinnedCertificatesTrustEvaluator(certificates: certificates)
+    }
+    
+    private func createSecKey(from base64String: String) -> SecKey? {
+        guard let keyData = base64String.base64DecodedData() else { return nil }
+        
+        let options: [String: Any] = [
+            kSecAttrKeyType as String: kSecAttrKeyTypeRSA,
+            kSecAttrKeyClass as String: kSecAttrKeyClassPublic,
+            kSecAttrKeySizeInBits as String: 2048
+        ]
+        
+        var error: Unmanaged<CFError>?
+        let secKey = SecKeyCreateWithData(keyData as CFData, options as CFDictionary, &error)
+        
+        if let error = error {
+            print("Error creating public key: \(error.takeRetainedValue())")
+        }
+        
+        return secKey
+    }
+}
+
+/// Evaluates trust by trying multiple evaluators — succeeds if ANY evaluator passes.
+class CompositeTrustEvaluator: ServerTrustEvaluating {
+    private let evaluators: [ServerTrustEvaluating]
+    
+    init(evaluators: [ServerTrustEvaluating]) {
+        self.evaluators = evaluators
+    }
+    
+    func evaluate(_ trust: SecTrust, forHost host: String) throws {
+        var lastError: Error?
+        
+        for evaluator in evaluators {
+            do {
+                try evaluator.evaluate(trust, forHost: host)
+                return // Success — at least one evaluator passed
+            } catch {
+                lastError = error
+            }
+        }
+        
+        throw lastError ?? AFError.serverTrustEvaluationFailed(reason: .noPublicKeysFound)
     }
 }
