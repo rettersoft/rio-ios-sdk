@@ -291,7 +291,7 @@ extension RioService: TargetType, AccessTokenAuthorizable {
         var headers: [String: String] = [:]
         headers["Content-Type"] = "application/json"
         headers["x-rio-sdk-client"] = "iOS"
-        headers["rio-sdk-version"] = "0.0.66"
+        headers["rio-sdk-version"] = "0.0.67"
         headers["installationId"] = String.getInstallationId()
         
         switch self {
@@ -500,7 +500,7 @@ class HybridPinningServerTrustManager: ServerTrustManager {
                 evaluators.append(PinnedCertificatesTrustEvaluator(certificates: certificates))
             }
             
-            return evaluators.count > 1 ? CompositeTrustEvaluator(evaluators: evaluators) : evaluators.first
+            return evaluators.count > 1 ? AnyTrustEvaluator(evaluators: evaluators) : evaluators.first
         }
         
         // Public key only
@@ -535,7 +535,7 @@ class HybridPinningServerTrustManager: ServerTrustManager {
 }
 
 /// Evaluates trust by trying multiple evaluators — succeeds if ANY evaluator passes.
-class CompositeTrustEvaluator: ServerTrustEvaluating {
+class AnyTrustEvaluator: ServerTrustEvaluating {
     private let evaluators: [ServerTrustEvaluating]
     
     init(evaluators: [ServerTrustEvaluating]) {
