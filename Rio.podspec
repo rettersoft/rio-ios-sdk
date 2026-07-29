@@ -8,7 +8,7 @@
 
 Pod::Spec.new do |s|
   s.name             = 'Rio'
-  s.version          = '0.0.67'
+  s.version          = '0.0.68'
   s.summary          = 'An iOS SDK for seamless integration with Retter’s Rio backend.'
   s.description      = <<-DESC
 Rio is an SDK that simplifies integrating Retter’s Rio platform into your iOS app.

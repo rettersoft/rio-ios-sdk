@@ -47,6 +47,32 @@ Initialize the SDK with your project id created in RBS console.
 let rio = Rio.init(config: RioConfig(projectId: "{PROJECT_ID}"))
 ```
 
+## Keychain Accessibility
+
+Rio stores the session token (access & refresh token) in the iOS Keychain. You can control the Keychain accessibility level of this record via `RioConfig`:
+
+```swift
+let rio = Rio.init(config: RioConfig(
+    projectId: "{PROJECT_ID}",
+    keychainAccessibility: .whenUnlockedThisDeviceOnly
+))
+```
+
+| Option | Readable when | Included in backups / migrates to a new device |
+| --- | --- | --- |
+| `.whenUnlocked` *(default behavior when not set)* | Device is unlocked | Yes |
+| `.whenUnlockedThisDeviceOnly` | Device is unlocked | No |
+| `.afterFirstUnlock` | Any time after first unlock since reboot (incl. locked) | Yes |
+| `.afterFirstUnlockThisDeviceOnly` | Any time after first unlock since reboot (incl. locked) | No |
+| `.whenPasscodeSetThisDeviceOnly` | Device is unlocked & has a passcode | No (deleted if passcode is removed) |
+
+Notes:
+
+- If you don't set `keychainAccessibility`, the SDK keeps its existing behavior (`.whenUnlocked`).
+- `.whenUnlockedThisDeviceOnly` is recommended for most apps: the token stays out of encrypted backups and can't be moved to another device, with no impact on normal usage.
+- If your app calls Rio from background tasks that may run while the device is locked (silent push, background fetch), prefer `.afterFirstUnlockThisDeviceOnly` instead.
+- The accessibility level is applied on the next token write. Since tokens are refreshed periodically, existing installs migrate to the new level automatically shortly after the app starts using it.
+
 ## Authenticate 
 
 Rio client's authenticateWithCustomToken method should be used to authenticate a user. If you don't call this method, client will send actions as an anonymous user.

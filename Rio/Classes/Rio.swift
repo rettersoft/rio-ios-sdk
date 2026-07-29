@@ -112,6 +112,52 @@ public struct RioSSLConfig {
     }
 }
 
+/// Controls the accessibility (`kSecAttrAccessible`) of the token record Rio stores in the Keychain.
+///
+/// Two things vary between levels:
+/// - **When the token can be read:** while the device is unlocked, or any time after the first unlock following a reboot.
+/// - **Whether the token leaves the device:** non-`ThisDeviceOnly` levels are included in encrypted backups and migrate
+///   to a new device when a backup is restored; `ThisDeviceOnly` levels are protected by device-specific keys and never
+///   leave the device.
+public enum RioKeychainAccessibility {
+    /// Token is readable only while the device is unlocked.
+    /// Included in encrypted backups and can migrate to another device via backup restore.
+    /// This is the default when no accessibility is configured (KeychainSwift's default behavior).
+    case whenUnlocked
+
+    /// Token is readable only while the device is unlocked.
+    /// Never included in backups and never migrates to another device.
+    /// Recommended for most apps: closes the backup/migration attack surface with no downside,
+    /// unless the app needs to reach Rio in the background while the device is locked.
+    case whenUnlockedThisDeviceOnly
+
+    /// Token is readable any time after the device has been unlocked once since reboot,
+    /// including while it is locked (e.g. background fetch, silent push).
+    /// Included in encrypted backups and can migrate to another device via backup restore.
+    case afterFirstUnlock
+
+    /// Token is readable any time after the device has been unlocked once since reboot,
+    /// including while it is locked (e.g. background fetch, silent push).
+    /// Never included in backups and never migrates to another device.
+    /// Recommended if the app calls Rio from background tasks that may run while the device is locked.
+    case afterFirstUnlockThisDeviceOnly
+
+    /// Token is readable only while the device is unlocked, and only if a passcode is set.
+    /// Never included in backups; the token is deleted if the user removes their passcode.
+    /// Strictest option — sign-in state is lost on devices without a passcode.
+    case whenPasscodeSetThisDeviceOnly
+
+    var keychainSwiftAccessOption: KeychainSwiftAccessOptions {
+        switch self {
+        case .whenUnlocked: return .accessibleWhenUnlocked
+        case .whenUnlockedThisDeviceOnly: return .accessibleWhenUnlockedThisDeviceOnly
+        case .afterFirstUnlock: return .accessibleAfterFirstUnlock
+        case .afterFirstUnlockThisDeviceOnly: return .accessibleAfterFirstUnlockThisDeviceOnly
+        case .whenPasscodeSetThisDeviceOnly: return .accessibleWhenPasscodeSetThisDeviceOnly
+        }
+    }
+}
+
 public struct RioConfig {
     var projectId: String?
     var secretKey: String?
@@ -124,6 +170,7 @@ public struct RioConfig {
     var culture: String? = defaultCulture
     var retryConfig: RetryConfig?
     var needsTokenDeletion: Bool?
+    var keychainAccessibility: RioKeychainAccessibility?
 
     /// Custom SSL Pinning: Requires exact domain match. Each domain can have multiple public keys and/or certificates.
     /*
@@ -155,7 +202,8 @@ public struct RioConfig {
         isLoggingEnabled: Bool = false,
         culture: String? = nil,
         retryConfig: RetryConfig? = nil,
-        needsTokenDeletion: Bool? = nil
+        needsTokenDeletion: Bool? = nil,
+        keychainAccessibility: RioKeychainAccessibility? = nil
     ) {
         self.projectId = projectId
         self.secretKey = secretKey
@@ -168,6 +216,7 @@ public struct RioConfig {
         self.culture = culture == nil ? defaultCulture : culture
         self.retryConfig = retryConfig == nil ? RetryConfig() : retryConfig
         self.needsTokenDeletion = needsTokenDeletion
+        self.keychainAccessibility = keychainAccessibility
     }
 }
 
@@ -543,7 +592,7 @@ public class Rio {
         
         let obj = try? JSONEncoder().encode(tokenData)
         guard let object = obj else { return }
-        keychain.set(object, forKey: RioKeychainKey.token.keyName) // ??
+        keychain.set(object, forKey: RioKeychainKey.token.keyName, withAccess: config.keychainAccessibility?.keychainSwiftAccessOption)
         
         logger.log("saveTokenData 2")
         
