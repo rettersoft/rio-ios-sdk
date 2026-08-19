@@ -108,12 +108,57 @@ extension ViewController : RioClientDelegate {
 ## Get a cloud object
 
 ```swift
-rio.getCloudObject(with: RioCloudObjectOptions(classID: "Test")) { object in
+rio.getCloudObject(with: RioCloudObjectOptions(classID: "Test", useLocal: false)) { object in
+    
+    print("InstanceId is \(object.instanceId)")
     
 } onError: { error in
     
 }
 ```
+
+`useLocal` is optional and `nil` behaves like `false`. Writing it out is still
+worthwhile in `getCloudObject`: the flag decides whether the SDK makes an
+`rbs.core.request.INSTANCE` round trip, which is a choice worth seeing at the
+call site.
+
+### useLocal
+
+`useLocal: false` instantiates the object on the server: a request that returns
+the instance's `methods`, `response` and `isNewInstance`, and reports
+`cloudObjectNotFound` if the instance does not exist.
+
+`useLocal: true` builds the handle on the device with no request. It needs an
+`instanceID`, which comes from a previous remote instantiation as
+`object.instanceId`:
+
+```swift
+if let cachedInstanceId {
+    rio.getCloudObject(with: RioCloudObjectOptions(
+        classID: "Test",
+        instanceID: cachedInstanceId,
+        useLocal: true
+    )) { object in
+        
+    } onError: { error in
+        
+    }
+}
+```
+
+Two things to know:
+
+- A locally built object has no `methods`, `response` or `isNewInstance` — those
+  only come from the server. `call`, `state` and `listInstances` still work; they
+  go to the network on their own.
+- `useLocal: true` without an `instanceID` is ignored: the SDK instantiates
+  remotely instead, which on a first launch creates a new instance and returns its
+  id. So the usual shape is to instantiate remotely once, keep the id, and use the
+  local path afterwards.
+
+`useLocal` is only read by `getCloudObject`. `call`, `listInstances` and
+`makeStaticCall` accept it because they share the options type, but ignore its
+value.
 
 ## Call a method on a cloud object
 
@@ -124,6 +169,14 @@ object.call(with: RioCloudObjectOptions(method: "sayHello")) { resp in
     
 }
 ```
+
+Leave `useLocal` out here, or pass `false`. A method call goes to the network
+either way, so `true` would compile, be ignored, and leave a promise in the source
+that the call does not keep. The same holds for `listInstances` and
+`makeStaticCall`.
+
+Note that this is true of a locally built object too: `useLocal: true` skips the
+request that produces the handle, not the requests its methods make.
 
 ## Listen to realtime updates on cloud objects
 

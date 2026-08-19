@@ -5,12 +5,6 @@ platform :ios, '13.0'
 
 target 'Rio_Example' do
   pod 'Rio', :path => '../'
-
-  target 'Rio_Tests' do
-    inherit! :search_paths
-
-    
-  end
 end
 
 post_install do |installer|

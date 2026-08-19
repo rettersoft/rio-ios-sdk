@@ -27,7 +27,7 @@ class ViewController: UIViewController {
     }
     
     @IBAction func btnGetObjectTapped(_ sender: Any) {
-        rio.getCloudObject(with: RioCloudObjectOptions(classID: "Test")) { object in
+        rio.getCloudObject(with: RioCloudObjectOptions(classID: "Test", useLocal: false)) { object in
             
             print("InstanceId is \(object.instanceId)")
             
@@ -49,7 +49,7 @@ class ViewController: UIViewController {
     }
     
     @IBAction func btnSayHelloTapped(_ sender: Any) {
-        self.rioObj?.call(with: RioCloudObjectOptions(method: "sayHello", culture: "tr-TR")) { resp in
+        self.rioObj?.call(with: RioCloudObjectOptions(method: "sayHello", useLocal: false, culture: "tr-TR")) { resp in
             
             print("resp \(String(describing: resp.body))")
             
@@ -64,7 +64,7 @@ class ViewController: UIViewController {
     }
     
     private func exampleForStaticCall() {
-        rio.makeStaticCall(with: .init(classID: "ExampleProject", method: "ExampleMethod")) { resp in
+        rio.makeStaticCall(with: .init(classID: "ExampleProject", method: "ExampleMethod", useLocal: false)) { resp in
 
         } onError: { RioCloudObjectError in
 

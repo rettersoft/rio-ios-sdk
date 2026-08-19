@@ -1556,6 +1556,10 @@ public struct RioCloudObjectOptions {
     public var httpMethod: Moya.Method?
     public var body: [String: Any]?
     public var path: String?
+    /// Whether the object handle is built locally instead of over the network.
+    ///
+    /// `nil` behaves like `false`. `true` requires `instanceID`; only
+    /// `getCloudObject` reads it.
     public var useLocal: Bool?
     public var isStaticMethod: Bool?
     public var culture: String?
