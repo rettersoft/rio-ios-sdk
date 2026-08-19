@@ -108,22 +108,73 @@ extension ViewController : RioClientDelegate {
 ## Get a cloud object
 
 ```swift
-rio.getCloudObject(with: RioCloudObjectOptions(classID: "Test")) { object in
+rio.getCloudObject(with: RioCloudObjectOptions(classID: "Test", useLocal: false)) { object in
+    
+    print("InstanceId is \(object.instanceId)")
     
 } onError: { error in
     
 }
 ```
+
+`useLocal` has no default, so every options value states it. The flag decides
+whether the SDK makes an `rbs.core.request.INSTANCE` round trip, which is a
+choice worth seeing at the call site.
+
+### useLocal
+
+`useLocal: false` instantiates the object on the server: a request that returns
+the instance's `methods`, `response` and `isNewInstance`, and reports
+`cloudObjectNotFound` if the instance does not exist.
+
+`useLocal: true` builds the handle on the device with no request. It needs an
+`instanceID`, which comes from a previous remote instantiation as
+`object.instanceId`:
+
+```swift
+if let cachedInstanceId {
+    rio.getCloudObject(with: RioCloudObjectOptions(
+        classID: "Test",
+        instanceID: cachedInstanceId,
+        useLocal: true
+    )) { object in
+        
+    } onError: { error in
+        
+    }
+}
+```
+
+Two things to know:
+
+- A locally built object has no `methods`, `response` or `isNewInstance` — those
+  only come from the server. `call`, `state` and `listInstances` still work; they
+  go to the network on their own.
+- `useLocal: true` without an `instanceID` is ignored: the SDK instantiates
+  remotely instead, which on a first launch creates a new instance and returns its
+  id. So the usual shape is to instantiate remotely once, keep the id, and use the
+  local path afterwards.
+
+`useLocal` is only read by `getCloudObject`. `call`, `listInstances` and
+`makeStaticCall` require it because they share the options type, but ignore its
+value.
 
 ## Call a method on a cloud object
 
 ```swift
-object.call(with: RioCloudObjectOptions(method: "sayHello")) { resp in
+object.call(with: RioCloudObjectOptions(method: "sayHello", useLocal: false)) { resp in
     
 } onError: { error in
     
 }
 ```
+
+Always pass `useLocal: false` here. A method call goes to the network either way,
+so `true` would compile, be ignored, and leave a promise in the source that the
+call does not keep. The same holds for `listInstances` and `makeStaticCall`.
+
+Note that this is true of a locally built object too: `useLocal: true` skips the
+request that produces the handle, not the requests its methods make.
 
 ## Listen to realtime updates on cloud objects
 
@@ -134,6 +185,109 @@ object.state?.public.subscribe(onSuccess: { data in
     
 })
 ```
+
+## Migrating to 0.1.0
+
+**0.1.0 is not released yet.** It is available as the prerelease `0.1.0-beta.1`
+so you can migrate and report problems before the change becomes mandatory.
+
+Nothing changes for you until you ask for it. CocoaPods does not resolve a
+prerelease unless the requirement names one, so `pod 'Rio'`, `pod 'Rio', '~> 0.0.68'`
+and `pod 'Rio', '~> 0.1'` all keep giving you 0.0.68.
+
+To try the beta, name the version explicitly:
+
+```ruby
+pod 'Rio', '0.1.0-beta.1'
+```
+
+With Swift Package Manager, point at the tag. The `main` branch that the
+installation section recommends still carries 0.0.68, so following those
+instructions does not pull the beta either:
+
+```swift
+.package(url: "https://github.com/rettersoft/rio-ios-sdk", .exact("0.1.0-beta.1"))
+```
+
+The API in the beta is what 0.1.0 will ship, so migrating now is not throwaway
+work.
+
+---
+
+`useLocal` changed from `Bool?` to `Bool` and has no default, so **every**
+`RioCloudObjectOptions` must state it. That is the point: the flag decides whether
+a network round trip happens, and it was the one field you could forget about and
+still compile — while forgetting it selected the request.
+
+The first item below is a compile error, so the compiler lists your call sites. The
+second is mostly a compile error, with one case that only warns.
+
+### Add `useLocal` to every options value
+
+It sits between `path` and `isStaticMethod` in the initializer, so existing
+arguments keep their order — you insert one argument rather than rewriting the
+call.
+
+```swift
+// before
+RioCloudObjectOptions(classID: "Test")
+RioCloudObjectOptions(method: "sayHello", culture: "tr-TR")
+RioCloudObjectOptions(classID: "Test", method: "staticHello")
+
+// after
+RioCloudObjectOptions(classID: "Test", useLocal: false)
+RioCloudObjectOptions(method: "sayHello", useLocal: false, culture: "tr-TR")
+RioCloudObjectOptions(classID: "Test", method: "staticHello", useLocal: false)
+```
+
+`call`, `listInstances` and `makeStaticCall` need it too even though they ignore
+its value, because they share the options type. Pass `false` — a method call
+reaches the network either way. This applies to options with no other arguments as
+well:
+
+```swift
+// before
+object.listInstances(with: RioCloudObjectOptions())
+
+// after
+object.listInstances(with: RioCloudObjectOptions(useLocal: false))
+```
+
+Do not migrate by grepping for `RioCloudObjectOptions(` — that misses call sites
+written with the implicit form, which are easy to have and just as broken:
+
+```swift
+rio.makeStaticCall(with: .init(classID: "Example", method: "Method", useLocal: false))
+rio.getCloudObject(with: .init(classID: "CMS", instanceID: "default", useLocal: true))
+```
+
+Build instead and work through the errors; the compiler finds every form.
+
+Runtime behavior does not change: `nil` and `false` were already the same thing,
+so `useLocal: false` preserves exactly what omitting it used to do.
+
+### Treating `useLocal` as an optional
+
+`nil` and `false` were indistinguishable at runtime, so these checks were never
+doing anything:
+
+```swift
+// before
+if let useLocal = options.useLocal, useLocal { ... }
+if options.useLocal == nil { ... }
+
+// after
+if options.useLocal { ... }
+```
+
+`if let` and assigning `nil` are compile errors. Comparing to `nil` still
+compiles, with a warning that it always returns the same value:
+
+```
+warning: comparing non-optional value of type 'Bool' to 'nil' always returns false
+```
+
+Treat that warning as an error to fix — the branch it guards can no longer run.
 
 ## License
 

@@ -1148,7 +1148,7 @@ public class Rio {
         let parameters: [String: Any] = options2.body?.compactMapValues( { $0 }) ?? [:]
         let headers = options2.headers?.compactMapValues( { $0 } ) ?? [:]
         
-        if (options2.useLocal ?? false),
+        if options2.useLocal,
            let instanceID = options2.instanceID,
            options2.classID != nil {
             
@@ -1556,7 +1556,11 @@ public struct RioCloudObjectOptions {
     public var httpMethod: Moya.Method?
     public var body: [String: Any]?
     public var path: String?
-    public var useLocal: Bool?
+    /// Whether the object handle is built locally instead of over the network.
+    ///
+    /// Has no default, so every call site states it. `true` requires
+    /// `instanceID`; only `getCloudObject` reads it.
+    public var useLocal: Bool
     public var isStaticMethod: Bool?
     public var culture: String?
     public var retryConfig: RetryConfig?
@@ -1571,7 +1575,7 @@ public struct RioCloudObjectOptions {
         httpMethod: Moya.Method? = nil,
         body: [String: Any]? = nil,
         path: String? = nil,
-        useLocal: Bool? = nil,
+        useLocal: Bool,
         isStaticMethod: Bool? = nil,
         culture: String? = nil,
         retryConfig: RetryConfig? = nil

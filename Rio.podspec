@@ -8,7 +8,9 @@
 
 Pod::Spec.new do |s|
   s.name             = 'Rio'
-  s.version          = '0.0.68'
+  # The version lives in RioSDKVersion.current, which is also what the
+  # rio-sdk-version request header reports. Read it here so the two cannot drift.
+  s.version          = File.read('Rio/Classes/RioVersion.swift')[/current = "([^"]+)"/, 1]
   s.summary          = 'An iOS SDK for seamless integration with Retter’s Rio backend.'
   s.description      = <<-DESC
 Rio is an SDK that simplifies integrating Retter’s Rio platform into your iOS app.
