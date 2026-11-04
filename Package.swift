@@ -6,8 +6,8 @@ import PackageDescription
 let package = Package(
     name: "Rio",
     platforms: [.macOS(.v10_15),
-                .iOS(.v13),
-                .tvOS(.v13),
+                .iOS(.v15),
+                .tvOS(.v15),
                 .watchOS(.v7)],
     products: [
         .library(name: "Rio", targets: ["Rio"])
@@ -20,7 +20,7 @@ let package = Package(
         .package(
             name: "Firebase",
             url: "https://github.com/firebase/firebase-ios-sdk.git",
-            .upToNextMajor(from: "11.11.0")
+            .upToNextMajor(from: "12.19.3")
         )
     ],
     targets: [

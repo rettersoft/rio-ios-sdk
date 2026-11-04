@@ -188,6 +188,48 @@ object.state?.public.subscribe(onSuccess: { data in
 })
 ```
 
+## Migrating to 0.1.0
+
+0.1.0 raises the minimum iOS version and the Firebase major. Read this section even
+if you do not use Firebase directly: it is a security fix, not a routine bump. The
+`RioCloudObjectOptions` API is unchanged, so existing call sites compile as they are.
+
+### Firebase 12.19.3 and iOS 15 (security fix)
+
+Private keys of several eMudhra intermediate certificate authorities were
+compromised in October 2026. FirebaseFirestore 13.1.0 and earlier (except 12.19.3)
+still trust certificates chained to them, so an attacker on the network can
+impersonate the Firestore backend that Rio uses for cloud object listeners. Google's
+guide is at
+https://firebase.google.com/support/guides/compromised-emudhra-intermediate-ca#apple-native-apps-firestore.
+
+The fix is only in the client SDK, so every installed build stays exposed until it
+is replaced. Rio 0.1.0 therefore requires:
+
+- **Firebase `>= 12.19.3, < 13`.** Firebase 13 is not published to CocoaPods, and 12
+  is the last major that is, so 12.19.3 is the floor on both package managers. If your
+  Podfile pins `Firebase/*` to `~> 11.x`, raise those pins to `~> 12.19.3`; every other
+  Firebase pod in the app (Analytics, Crashlytics, Messaging, Remote Config, ...) moves
+  to 12 with them.
+- **iOS 15.0** as the deployment target, because Firebase 12 does not build for
+  anything lower. Set `platform :ios, '15.0'` in the Podfile and raise
+  `IPHONEOS_DEPLOYMENT_TARGET` in the project.
+
+Firebase 12 removed a few APIs Rio never used; the ones most likely to show up in an
+app are Dynamic Links (`ActionCodeSettings.dynamicLinkDomain`) and
+`FirebaseOptions.deepLinkURLScheme` / `androidClientID` / `trackingID`.
+
+After updating, ship a new build and get users onto it. Nothing on the server side
+or in the OS closes the hole for builds already installed.
+
+```ruby
+pod 'Rio', '~> 0.1.0'
+```
+
+```swift
+.package(url: "https://github.com/rettersoft/rio-ios-sdk", from: "0.1.0")
+```
+
 ## License
 
 Rio is available under the MIT license. See the LICENSE file for more info.

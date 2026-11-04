@@ -5,5 +5,5 @@
 /// here and nowhere else, and tag the release with the same number so Swift
 /// Package Manager consumers resolve a matching version.
 enum RioSDKVersion {
-    static let current = "0.1.0-beta.1"
+    static let current = "0.1.0"
 }

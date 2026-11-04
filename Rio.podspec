@@ -21,7 +21,7 @@ Rio is an SDK that simplifies integrating Retter’s Rio platform into your iOS 
   s.author           = { 'Baran Baygan' => 'baran@rettermobile.com' }
   s.source           = { :git => 'https://github.com/rettersoft/rio-ios-sdk.git', :tag => s.version.to_s }
 
-  s.ios.deployment_target = '13.0'
+  s.ios.deployment_target = '15.0'
 
   s.source_files = 'Rio/Classes/**/*'
   
@@ -42,8 +42,8 @@ Rio is an SDK that simplifies integrating Retter’s Rio platform into your iOS 
   s.dependency 'Alamofire', '~> 5.9.0'
   s.dependency 'KeychainSwift', '~> 22.0'
   s.dependency 'JWTDecode', '~> 2.4'
-  s.dependency 'Firebase', '~> 11.11.0'
-  s.dependency 'Firebase/Firestore', '~> 11.11.0'
-  s.dependency 'Firebase/Auth', '~> 11.11.0'
+  s.dependency 'Firebase', '>= 12.19.3', '< 13.0'
+  s.dependency 'Firebase/Firestore', '>= 12.19.3', '< 13.0'
+  s.dependency 'Firebase/Auth', '>= 12.19.3', '< 13.0'
 
 end
