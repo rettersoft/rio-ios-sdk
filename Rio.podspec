@@ -27,7 +27,7 @@ Rio is an SDK that simplifies integrating Retter’s Rio platform into your iOS 
   
   s.resource_bundles = {
     'RioBundle' => [
-        '**/Assets/*'
+        'Rio/Assets/*.cer'
     ]
   }
 

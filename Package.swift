@@ -29,7 +29,8 @@ let package = Package(
             .product(name: "FirebaseAuth", package: "Firebase"),
             .product(name: "FirebaseFirestore", package: "Firebase")
             
-        ], path: "Rio/Classes")
+        ], path: "Rio", sources: ["Classes"], resources: [.copy("Assets")]),
+        .testTarget(name: "RioTests", dependencies: ["Rio"], path: "Tests/RioTests")
     ]
 )
 

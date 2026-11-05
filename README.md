@@ -33,11 +33,14 @@ pod 'Rio'
 
 ### Swift Package Manager
 
-You can use swift package manager with following repo url and using main branch:
+Add the package by its repository URL and depend on a release tag, not on `main`:
 
+```swift
+.package(url: "https://github.com/rettersoft/rio-ios-sdk", from: "0.1.0")
 ```
-https://github.com/rettersoft/rio-ios-sdk
-```
+
+Rio ships its SSL pinning certificates as package resources since 0.1.0; earlier
+versions silently ran without pinning when installed through Swift Package Manager.
 
 ## Initialize SDK
 

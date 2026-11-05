@@ -433,15 +433,9 @@ public class Rio {
         }
         
         // Bundle certificates
-        guard let bundleURL = Bundle(for: type(of: self)).url(forResource: "RioBundle", withExtension: "bundle"),
-              let bundle = Bundle(url: bundleURL) else {
-            logger.log("WARNING! An error occurred while pinning SSL - bundle not found.")
-            return MoyaProvider<RioService>(plugins: plugins)
-        }
-        
         let certificates: [SecCertificate] = [1, 2, 3, 4, 5].compactMap { element in
-            guard let path = bundle.path(forResource: "\(element)", ofType: "cer"),
-                  let certificateData = try? Data(contentsOf: URL(fileURLWithPath: path)),
+            guard let url = Rio.bundledCertificateURL(named: "\(element)"),
+                  let certificateData = try? Data(contentsOf: url),
                   let certificate = SecCertificateCreateWithData(nil, certificateData as CFData) else {
                 logger.log("WARNING! Failed to load certificate \(element).cer")
                 return nil
@@ -450,6 +444,9 @@ public class Rio {
         }
         
         guard !certificates.isEmpty else {
+            // Pinning was requested but the certificates shipped with the SDK are missing, so the
+            // session below would run without pinning. Make that impossible to miss in development.
+            assertionFailure("Rio: sslPinningEnabled is true but no bundled certificates were found. Check the SDK's resource bundle.")
             logger.log("WARNING! No valid certificates found for SSL pinning.")
             return MoyaProvider<RioService>(plugins: plugins)
         }
@@ -720,6 +717,23 @@ public class Rio {
         }
         
         deltaTime =  TimeInterval(serverTime) - Date().timeIntervalSince1970
+    }
+    
+    /// Locates one of the pinning certificates shipped with the SDK (`Rio/Assets/*.cer`).
+    ///
+    /// CocoaPods packs them into the `RioBundle` resource bundle next to the SDK binary;
+    /// Swift Package Manager packs them into `Bundle.module`, keeping the `Assets` folder.
+    static func bundledCertificateURL(named name: String) -> URL? {
+        #if SWIFT_PACKAGE
+        return Bundle.module.url(forResource: name, withExtension: "cer", subdirectory: "Assets")
+            ?? Bundle.module.url(forResource: name, withExtension: "cer")
+        #else
+        guard let bundleURL = Bundle(for: Rio.self).url(forResource: "RioBundle", withExtension: "bundle"),
+              let bundle = Bundle(url: bundleURL) else {
+            return nil
+        }
+        return bundle.url(forResource: name, withExtension: "cer")
+        #endif
     }
     
     private func getFirebaseOptions(with options: RioFirebaseOptions) -> FirebaseOptions {
